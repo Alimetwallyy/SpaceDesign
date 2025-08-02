@@ -2,11 +2,6 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import io
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from pptx.dml.color import RGBColor
-from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
-from pptx.enum.shapes import MSO_SHAPE
 import uuid
 import logging
 
@@ -19,7 +14,7 @@ st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="
 
 # --- Helper Functions ---
 def hex_to_rgb(hex_color):
-    """Converts a hex color string to an RGB tuple."""
+    """Converts a hex color structure to an RGB tuple."""
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
@@ -50,8 +45,6 @@ def validate_group_params(params):
         errors.append("Shelf thickness must be positive.")
     if params['side_panel_thickness'] <= 0:
         errors.append("Side panel thickness must be positive.")
-    if params['bin_split_thickness'] <= 0:
-        errors.append("Bin split thickness must be positive.")
     if params['num_cols'] < 1:
         errors.append("Number of columns must be at least 1.")
     if params['num_rows'] < 1:
@@ -72,7 +65,6 @@ def draw_bay_group(params):
     ground_clearance = params['ground_clearance']
     shelf_thickness = params['shelf_thickness']
     side_panel_thickness = params['side_panel_thickness']
-    bin_split_thickness = params['bin_split_thickness']
     num_cols = params['num_cols']
     num_rows = params['num_rows']
     has_top_cap = params['has_top_cap']
@@ -81,7 +73,6 @@ def draw_bay_group(params):
     zoom_factor = params.get('zoom', 1.0)
 
     visual_shelf_thickness = min(shelf_thickness, 18.0)
-    visual_bin_split_thickness = min(bin_split_thickness, 18.0)
     visual_side_panel_thickness = max(side_panel_thickness, 10.0)
 
     core_width = num_bays * bay_width
@@ -97,14 +88,13 @@ def draw_bay_group(params):
     current_x = 0
     for bay_idx in range(num_bays):
         net_width_per_bay = bay_width - 2 * side_panel_thickness
-        total_internal_dividers = (num_cols - 1) * bin_split_thickness
-        bin_width = (net_width_per_bay - total_internal_dividers) / num_cols if num_cols > 0 else 0
+        bin_width = net_width_per_bay / num_cols if num_cols > 0 else 0
 
         bin_start_x = current_x
         if num_cols > 1:
             for i in range(1, num_cols):
-                split_x = bin_start_x + (i * bin_width) + ((i-1) * bin_split_thickness)
-                ax.add_patch(patches.Rectangle((split_x, ground_clearance), visual_bin_split_thickness, total_height - ground_clearance, facecolor='none', edgecolor=color, lw=1.5))
+                split_x = bin_start_x + (i * bin_width)
+                ax.add_patch(patches.Rectangle((split_x, ground_clearance), 0, total_height - ground_clearance, facecolor='none', edgecolor=color, lw=1.5))
         
         if bay_idx < num_bays - 1:
             divider_x = current_x + bay_width
@@ -138,6 +128,9 @@ def draw_bay_group(params):
     if has_top_cap:
         ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, total_height - visual_shelf_thickness), total_group_width, visual_shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
 
+    # Add Ground Clearance dimension
+    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), ground_clearance, f"Ground Clearance: {ground_clearance:.0f} mm", is_vertical=True, offset=10)
+
     draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 2, core_width + visual_side_panel_thickness, -dim_offset_y * 2, f"Total Group Width: {total_group_width:.0f} mm", offset=10)
     draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10)
 
@@ -146,12 +139,11 @@ def draw_bay_group(params):
         loop_current_x = 0
         for bay_idx in range(num_bays):
             net_width_per_bay = bay_width - 2 * side_panel_thickness
-            total_internal_dividers = (num_cols - 1) * bin_split_thickness
-            bin_width = (net_width_per_bay - total_internal_dividers) / num_cols if num_cols > 0 else 0
+            bin_width = net_width_per_bay / num_cols if num_cols > 0 else 0
             
             bin_start_x = loop_current_x
             for i in range(num_cols):
-                dim_start_x = bin_start_x + (i * (bin_width + bin_split_thickness))
+                dim_start_x = bin_start_x + (i * bin_width)
                 dim_end_x = dim_start_x + bin_width
                 draw_dimension_line(ax, dim_start_x, dim_y_pos, dim_end_x, dim_y_pos, f"{bin_width:.1f}", offset=10, color='#3b82f6')
             
@@ -165,49 +157,29 @@ def draw_bay_group(params):
     
     return fig
 
-def create_editable_svg(bay_groups):
+def create_editable_svg(bay_group):
     """Creates an SVG file from bay group data using Matplotlib."""
-    all_svgs = []
-    for group_data in bay_groups:
-        logger.debug(f"Processing group: {group_data['name']}")
-        fig = draw_bay_group(group_data)
-        
-        svg_buf = io.BytesIO()
-        fig.savefig(svg_buf, format='svg', bbox_inches='tight', pad_inches=0.1)
-        plt.close(fig)
-        svg_buf.seek(0)
-        all_svgs.append((group_data['name'], svg_buf))
+    logger.debug(f"Processing group: {bay_group['name']}")
+    fig = draw_bay_group(bay_group)
     
-    if not all_svgs:
-        logger.error("No SVG files generated")
-        st.error("Failed to generate SVG file. Please check configuration.")
-        return None
+    svg_buf = io.BytesIO()
+    fig.savefig(svg_buf, format='svg', bbox_inches='tight', pad_inches=0.1)
+    plt.close(fig)
+    svg_buf.seek(0)
     
-    # Combine into a single SVG or zip if multiple groups (for simplicity, single file per group for now)
-    combined_buf = io.BytesIO()
-    if len(all_svgs) == 1:
-        combined_buf.write(all_svgs[0][1].getvalue())
-    else:
-        from zipfile import ZipFile
-        with ZipFile(combined_buf, 'w') as zip_file:
-            for name, buf in all_svgs:
-                zip_file.writestr(f"{name}.svg", buf.getvalue())
-        combined_buf.seek(0)
-    
-    return combined_buf
+    return svg_buf
 
 # --- Initialize Session State ---
-if 'bay_groups' not in st.session_state:
-    st.session_state.bay_groups = [{
+if 'bay_group' not in st.session_state:
+    st.session_state.bay_group = {
         "id": str(uuid.uuid4()),
-        "name": "Group A",
+        "name": "Bay Design",
         "num_bays": 2,
         "bay_width": 1050.0,
         "total_height": 2000.0,
         "ground_clearance": 50.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
-        "bin_split_thickness": 18.0,
         "num_cols": 4,
         "num_rows": 5,
         "has_top_cap": True,
@@ -215,67 +187,33 @@ if 'bay_groups' not in st.session_state:
         "bin_heights": [350.0] * 5,
         "lock_heights": [False] * 5,
         "zoom": 1.5
-    }]
+    }
 
-for group in st.session_state.bay_groups:
-    if 'bin_split_thickness' not in group:
-        group['bin_split_thickness'] = 18.0
-    if 'zoom' not in group:
-        group['zoom'] = 1.5
-
-# --- UI and Logic ---
-st.title("Storage Bay Designer")
-st.markdown("Design and visualize storage bay configurations with real-time previews and generate editable SVG outputs.")
-
-st.sidebar.header("Manage Bay Groups", divider="gray")
-st.sidebar.markdown("Create and configure storage bay groups below.")
-
-with st.sidebar.expander("Add New Group", expanded=True):
-    with st.form("new_group_form"):
-        new_group_name = st.text_input("Group Name", "New Group", help="Enter a unique name for the bay group.")
-        add_group_submitted = st.form_submit_button("Add Group")
-        if add_group_submitted:
-            if any(g['name'] == new_group_name for g in st.session_state.bay_groups):
-                st.error("Group name must be unique.")
-            else:
-                new_group = st.session_state.bay_groups[0].copy()
-                new_group['id'] = str(uuid.uuid4())
-                new_group['name'] = new_group_name
-                st.session_state.bay_groups.append(new_group)
-                st.success(f"Added group: {new_group_name}")
-                st.rerun()
-
-if len(st.session_state.bay_groups) > 1:
-    if st.sidebar.button("Remove Last Group", help="Remove the most recently added group."):
-        removed_group = st.session_state.bay_groups.pop()
-        st.success(f"Removed group: {removed_group['name']}")
-        st.rerun()
-
-st.sidebar.markdown("---")
-
-group_names = [g['name'] for g in st.session_state.bay_groups]
-selected_group_name = st.sidebar.selectbox("Select Group to Edit", group_names, help="Choose a group to modify its configuration.")
-active_group_idx = group_names.index(selected_group_name)
-group_data = st.session_state.bay_groups[active_group_idx]
+group_data = st.session_state.bay_group
 
 def distribute_total_height():
-    active_group = st.session_state.bay_groups[active_group_idx]
-    num_shelves_for_calc = active_group['num_rows'] + (1 if active_group['has_top_cap'] else 0)
-    total_shelf_thickness = num_shelves_for_calc * active_group['shelf_thickness']
-    available_space = active_group['total_height'] - active_group['ground_clearance'] - total_shelf_thickness
-    unlocked_indices = [i for i, locked in enumerate(active_group['lock_heights']) if not locked]
+    num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
+    total_shelf_thickness = num_shelves_for_calc * group_data['shelf_thickness']
+    available_space = group_data['total_height'] - group_data['ground_clearance'] - total_shelf_thickness
+    unlocked_indices = [i for i, locked in enumerate(group_data['lock_heights']) if not locked]
     num_unlocked = len(unlocked_indices)
     if available_space > 0 and num_unlocked > 0:
         uniform_net_h = available_space / num_unlocked
         for i in unlocked_indices:
-            active_group['bin_heights'][i] = uniform_net_h
+            group_data['bin_heights'][i] = uniform_net_h
 
 def update_total_height():
-    active_group = st.session_state.bay_groups[active_group_idx]
-    num_shelves_for_calc = active_group['num_rows'] + (1 if active_group['has_top_cap'] else 0)
-    total_shelf_thickness = num_shelves_for_calc * active_group['shelf_thickness']
-    total_net_bin_h = sum(active_group['bin_heights'])
-    active_group['total_height'] = total_net_bin_h + total_shelf_thickness + active_group['ground_clearance']
+    num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
+    total_shelf_thickness = num_shelves_for_calc * group_data['shelf_thickness']
+    total_net_bin_h = sum(group_data['bin_heights'])
+    group_data['total_height'] = total_net_bin_h + total_shelf_thickness + group_data['ground_clearance']
+
+# --- UI and Logic ---
+st.title("Storage Bay Designer")
+st.markdown("Design and visualize a storage bay configuration with real-time previews and generate an editable SVG output.")
+
+st.sidebar.header("Configure Bay Design", divider="gray")
+st.sidebar.markdown("Customize the single bay design below.")
 
 with st.sidebar.expander("Structure", expanded=True):
     st.markdown("**Configure the bay group structure.**")
@@ -342,13 +280,6 @@ with st.sidebar.expander("Materials & Appearance", expanded=True):
         on_change=update_total_height,
         help="Thickness of shelves."
     )
-    group_data['bin_split_thickness'] = st.number_input(
-        "Bin Split Thickness (mm)", 
-        min_value=1.0, 
-        value=float(group_data['bin_split_thickness']), 
-        key=f"bin_split_thick_{group_data['id']}",
-        help="Thickness of bin dividers."
-    )
     group_data['side_panel_thickness'] = st.number_input(
         "Side Panel Thickness (mm)", 
         min_value=1.0, 
@@ -380,29 +311,23 @@ else:
     st.error("Please resolve configuration errors to view the design.")
 
 st.sidebar.markdown("---")
-st.sidebar.header("Export Designs", divider="gray")
+st.sidebar.header("Export Design", divider="gray")
 
 download_button_placeholder = st.sidebar.empty()
 
-if st.sidebar.button("Generate SVG", type="primary", help="Generate an editable SVG file with all bay designs."):
-    has_errors = False
-    for group in st.session_state.bay_groups:
-        if validate_group_params(group):
-            has_errors = True
-            st.error(f"Cannot generate SVG due to errors in group: {group['name']}")
-    
-    if not has_errors:
-        svg_buffer = create_editable_svg(st.session_state.bay_groups)
+if st.sidebar.button("Generate SVG", type="primary", help="Generate an editable SVG file for the bay design."):
+    if not errors:
+        svg_buffer = create_editable_svg(group_data)
         if svg_buffer:
-            file_extension = ".zip" if len(st.session_state.bay_groups) > 1 else ".svg"
-            file_name = f"storage_bay_designs{file_extension}"
             download_button_placeholder.download_button(
                 label="Download SVG",
                 data=svg_buffer,
-                file_name=file_name,
-                mime="application/zip" if len(st.session_state.bay_groups) > 1 else "image/svg+xml",
+                file_name="storage_bay_design.svg",
+                mime="image/svg+xml",
                 type="primary",
-                help="Download the generated SVG file(s)."
+                help="Download the generated SVG file."
             )
         else:
             st.error("Failed to generate SVG file. Please check configuration and try again.")
+    else:
+        st.error("Cannot generate SVG due to configuration errors.")
