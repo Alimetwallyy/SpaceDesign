@@ -124,6 +124,7 @@ def draw_bay_group(params):
         if i < len(bin_heights):
             net_bin_h = bin_heights[i]
             pitch_h = net_bin_h + shelf_thickness
+            pitch_top_y = shelf_bottom_y + pitch_h  # Define pitch_top_y
             level_name = chr(65 + i)
             
             bin_bottom_y = shelf_top_y
