@@ -264,7 +264,7 @@ def create_editable_powerpoint(bay_groups):
             width = max(width_mm * scale, Inches(0.05))
             height = max(height_mm * scale, Inches(0.05))
             shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
-            shape.fill.no_fill()  # Transparent fill
+            shape.fill.background()  # Transparent fill
             shape.line.color.rgb = RGBColor(*hex_to_rgb(color_hex))
             shape.line.width = Pt(1.5)  # Thicker border for visibility
             return shape
