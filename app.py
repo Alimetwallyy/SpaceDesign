@@ -4,13 +4,25 @@ import matplotlib.patches as patches
 import io
 import uuid
 import logging
+from time import sleep
 
 # --- Configure Logging (suppressed in production) ---
 logging.basicConfig(level=logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
-# --- Page Configuration ---
-st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
+# --- Custom Theme ---
+st.set_page_config(
+    layout="wide",
+    page_title="Storage Bay Designer",
+    page_icon="📐",
+    theme={
+        "primaryColor": "#4A90E2",
+        "backgroundColor": "#F5F7FA",
+        "secondaryBackgroundColor": "#FFFFFF",
+        "textColor": "#2C3E50",
+        "font": "sans serif"
+    }
+)
 
 # --- Helper Functions ---
 def hex_to_rgb(hex_color):
@@ -208,126 +220,158 @@ def update_total_height():
     total_net_bin_h = sum(group_data['bin_heights'])
     group_data['total_height'] = total_net_bin_h + total_shelf_thickness + group_data['ground_clearance']
 
-# --- UI and Logic ---
-st.title("Storage Bay Designer")
-st.markdown("Design and visualize a storage bay configuration with real-time previews and generate an editable SVG output.")
+# --- UI Layout with Split Panels ---
+col1, col2 = st.columns([1, 2])
 
-st.sidebar.header("Configure Bay Design", divider="gray")
-st.sidebar.markdown("Customize the single bay design below.")
+with col1:
+    st.header("Configure Bay Design", divider="blue")
+    st.markdown("Customize your single bay design below.")
 
-with st.sidebar.expander("Structure", expanded=True):
-    st.markdown("**Configure the bay group structure.**")
-    group_data['num_bays'] = st.number_input("Number of Bays", min_value=1, value=int(group_data['num_bays']), key=f"num_bays_{group_data['id']}", help="Number of bays in the group.")
-    group_data['bay_width'] = st.number_input("Width per Bay (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}", help="Width of each bay in millimeters.")
-    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height, help="Total height of the bay group.")
-    group_data['ground_clearance'] = st.number_input("Ground Clearance (mm)", min_value=0.0, value=float(group_data['ground_clearance']), key=f"ground_clearance_{group_data['id']}", on_change=update_total_height, help="Height from ground to first shelf.")
-    group_data['has_top_cap'] = st.checkbox("Include Top Cap", value=group_data['has_top_cap'], key=f"has_top_cap_{group_data['id']}", on_change=update_total_height, help="Add a top cap shelf.")
+    with st.expander("Help", expanded=False):
+        st.markdown("""
+        ### Quick Start Guide
+        1. **Structure**: Set the basic dimensions and layout of your bay.
+        2. **Layout**: Define the number of shelves and columns.
+        3. **Bin Heights**: Adjust individual bin heights or use auto-distribution.
+        4. **Materials & Appearance**: Customize thickness, color, and zoom.
+        5. **Preview**: See your design update in real-time on the right.
+        6. **Export**: Generate an editable SVG file when ready.
+        """)
 
-with st.sidebar.expander("Layout", expanded=True):
-    st.markdown("**Configure the bay layout.**")
-    prev_num_rows = group_data['num_rows']
-    group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows).")
-    group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns per bay.")
+    # Configuration Accordion
+    with st.container():
+        with st.expander("Structure", expanded=True):
+            st.markdown("**Set the bay's structure.**")
+            group_data['num_bays'] = st.number_input("Number of Bays", min_value=1, value=int(group_data['num_bays']), key=f"num_bays_{group_data['id']}", help="Number of bays in the group.")
+            group_data['bay_width'] = st.number_input("Width per Bay (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}", help="Width of each bay in millimeters.")
+            group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height, help="Total height of the bay group.")
+            group_data['ground_clearance'] = st.number_input("Ground Clearance (mm)", min_value=0.0, value=float(group_data['ground_clearance']), key=f"ground_clearance_{group_data['id']}", on_change=update_total_height, help="Height from ground to first shelf.")
+            group_data['has_top_cap'] = st.checkbox("Include Top Cap", value=group_data['has_top_cap'], key=f"has_top_cap_{group_data['id']}", on_change=update_total_height, help="Add a top cap shelf.")
 
-    if prev_num_rows != group_data['num_rows']:
-        if group_data['num_rows'] > len(group_data['bin_heights']):
-            default_height = group_data['bin_heights'][0] if group_data['bin_heights'] else 350.0
-            group_data['bin_heights'].extend([default_height] * (group_data['num_rows'] - len(group_data['bin_heights'])))
-            group_data['lock_heights'].extend([False] * (group_data['num_rows'] - len(group_data['lock_heights'])))
-        else:
-            group_data['bin_heights'] = group_data['bin_heights'][:group_data['num_rows']]
-            group_data['lock_heights'] = group_data['lock_heights'][:group_data['num_rows']]
-        update_total_height()
+        with st.expander("Layout", expanded=False):
+            st.markdown("**Define the bay layout.**")
+            prev_num_rows = group_data['num_rows']
+            group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows).")
+            group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns per bay.")
 
-with st.sidebar.expander("Individual Bin Heights", expanded=True):
-    st.markdown("**Set individual bin heights.**")
-    auto_distribute = st.checkbox("Auto-distribute Heights", value=True, key=f"auto_distribute_{group_data['id']}", help="Automatically distribute height across unlocked bins.")
-    
-    current_bin_heights = []
-    current_lock_heights = []
-    for j in range(group_data['num_rows']):
-        level_name = chr(65 + j)
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            height = st.number_input(
-                f"Level {level_name} Net Height (mm)",
-                min_value=1.0,
-                value=float(group_data['bin_heights'][j]),
-                key=f"level_{group_data['id']}_{j}",
-                disabled=auto_distribute and not group_data['lock_heights'][j],
+            if prev_num_rows != group_data['num_rows']:
+                if group_data['num_rows'] > len(group_data['bin_heights']):
+                    default_height = group_data['bin_heights'][0] if group_data['bin_heights'] else 350.0
+                    group_data['bin_heights'].extend([default_height] * (group_data['num_rows'] - len(group_data['bin_heights'])))
+                    group_data['lock_heights'].extend([False] * (group_data['num_rows'] - len(group_data['lock_heights'])))
+                else:
+                    group_data['bin_heights'] = group_data['bin_heights'][:group_data['num_rows']]
+                    group_data['lock_heights'] = group_data['lock_heights'][:group_data['num_rows']]
+                update_total_height()
+
+        with st.expander("Bin Heights", expanded=False):
+            st.markdown("**Set individual bin heights.**")
+            auto_distribute = st.checkbox("Auto-distribute Heights", value=True, key=f"auto_distribute_{group_data['id']}", help="Automatically distribute height across unlocked bins.")
+            
+            current_bin_heights = []
+            current_lock_heights = []
+            for j in range(group_data['num_rows']):
+                level_name = chr(65 + j)
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    height = st.number_input(
+                        f"Level {level_name} Net Height (mm)",
+                        min_value=1.0,
+                        value=float(group_data['bin_heights'][j]),
+                        key=f"level_{group_data['id']}_{j}",
+                        disabled=auto_distribute and not group_data['lock_heights'][j],
+                        on_change=update_total_height,
+                        help=f"Net height for bin level {level_name}."
+                    )
+                with col2:
+                    locked = st.checkbox("Lock", value=group_data['lock_heights'][j], key=f"lock_{group_data['id']}_{j}", on_change=update_total_height, help="Lock this height to prevent auto-distribution.")
+                current_bin_heights.append(height)
+                current_lock_heights.append(locked)
+            
+            group_data['bin_heights'] = current_bin_heights
+            group_data['lock_heights'] = current_lock_heights
+            if auto_distribute:
+                distribute_total_height()
+            else:
+                update_total_height()
+
+        with st.expander("Materials & Appearance", expanded=False):
+            st.markdown("**Customize materials and visual settings.**")
+            group_data['shelf_thickness'] = st.number_input(
+                "Shelf Thickness (mm)", 
+                min_value=1.0, 
+                value=float(group_data['shelf_thickness']), 
+                key=f"shelf_thick_{group_data['id']}", 
                 on_change=update_total_height,
-                help=f"Net height for bin level {level_name}."
+                help="Thickness of shelves."
             )
-        with col2:
-            locked = st.checkbox("Lock", value=group_data['lock_heights'][j], key=f"lock_{group_data['id']}_{j}", on_change=update_total_height, help="Lock this height to prevent auto-distribution.")
-        current_bin_heights.append(height)
-        current_lock_heights.append(locked)
-    
-    group_data['bin_heights'] = current_bin_heights
-    group_data['lock_heights'] = current_lock_heights
-    if auto_distribute:
-        distribute_total_height()
-    else:
-        update_total_height()
+            group_data['side_panel_thickness'] = st.number_input(
+                "Side Panel Thickness (mm)", 
+                min_value=1.0, 
+                value=float(group_data['side_panel_thickness']), 
+                key=f"side_panel_thick_{group_data['id']}",
+                help="Thickness of outer side panels."
+            )
+            group_data['color'] = st.color_picker("Structure Color", value=group_data['color'], key=f"color_{group_data['id']}", help="Color of the bay structure.")
+            group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust zoom for preview and output.")
 
-with st.sidebar.expander("Materials & Appearance", expanded=True):
-    st.markdown("**Customize materials and visual settings.**")
-    group_data['shelf_thickness'] = st.number_input(
-        "Shelf Thickness (mm)", 
-        min_value=1.0, 
-        value=float(group_data['shelf_thickness']), 
-        key=f"shelf_thick_{group_data['id']}", 
-        on_change=update_total_height,
-        help="Thickness of shelves."
-    )
-    group_data['side_panel_thickness'] = st.number_input(
-        "Side Panel Thickness (mm)", 
-        min_value=1.0, 
-        value=float(group_data['side_panel_thickness']), 
-        key=f"side_panel_thick_{group_data['id']}",
-        help="Thickness of outer side panels."
-    )
-    group_data['color'] = st.color_picker("Structure Color", value=group_data['color'], key=f"color_{group_data['id']}", help="Color of the bay structure.")
-    group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust zoom for preview and output.")
+    errors = validate_group_params(group_data)
+    if errors:
+        st.error("**Configuration Errors**\n" + "\n".join(f"- {e}" for e in errors))
 
-errors = validate_group_params(group_data)
-if errors:
-    st.sidebar.error("**Configuration Errors**\n" + "\n".join(f"- {e}" for e in errors))
+    total_net_bin_h = sum(group_data['bin_heights'])
+    num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
+    total_shelf_h = num_shelves_for_calc * group_data['shelf_thickness']
+    calculated_total_height = total_net_bin_h + total_shelf_h + group_data['ground_clearance']
+    st.metric("Calculated Total Height", f"{calculated_total_height:.1f} mm", help="Sum of bin heights, shelf thicknesses, and ground clearance.")
 
-total_net_bin_h = sum(group_data['bin_heights'])
-num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
-total_shelf_h = num_shelves_for_calc * group_data['shelf_thickness']
-calculated_total_height = total_net_bin_h + total_shelf_h + group_data['ground_clearance']
-st.sidebar.metric("Calculated Total Height", f"{calculated_total_height:.1f} mm", help="Sum of bin heights, shelf thicknesses, and ground clearance.")
+    if st.button("Reset to Default", help="Revert all settings to initial values."):
+        st.session_state.bay_group = {
+            "id": str(uuid.uuid4()),
+            "name": "Bay Design",
+            "num_bays": 2,
+            "bay_width": 1050.0,
+            "total_height": 2000.0,
+            "ground_clearance": 50.0,
+            "shelf_thickness": 18.0,
+            "side_panel_thickness": 18.0,
+            "num_cols": 4,
+            "num_rows": 5,
+            "has_top_cap": True,
+            "color": "#4A90E2",
+            "bin_heights": [350.0] * 5,
+            "lock_heights": [False] * 5,
+            "zoom": 1.5
+        }
+        st.rerun()
 
-st.header(f"Design Preview: {group_data['name']}")
-if not errors:
-    try:
-        fig = draw_bay_group(group_data)
-        st.pyplot(fig, use_container_width=True)
-    except Exception as e:
-        st.error(f"Error rendering preview: {str(e)}")
-else:
-    st.error("Please resolve configuration errors to view the design.")
+    with st.container():
+        if st.button("Generate SVG", type="primary", help="Generate an editable SVG file for the bay design."):
+            if not errors:
+                with st.spinner("Generating SVG..."):
+                    sleep(1)  # Simulate processing time
+                    svg_buffer = create_editable_svg(group_data)
+                    if svg_buffer:
+                        st.download_button(
+                            label="Download SVG",
+                            data=svg_buffer,
+                            file_name="storage_bay_design.svg",
+                            mime="image/svg+xml",
+                            type="primary",
+                            help="Download the generated SVG file."
+                        )
+                    else:
+                        st.error("Failed to generate SVG file. Please check configuration.")
+            else:
+                st.error("Cannot generate SVG due to configuration errors.")
 
-st.sidebar.markdown("---")
-st.sidebar.header("Export Design", divider="gray")
-
-download_button_placeholder = st.sidebar.empty()
-
-if st.sidebar.button("Generate SVG", type="primary", help="Generate an editable SVG file for the bay design."):
+with col2:
+    st.header("Design Preview", divider="blue")
     if not errors:
-        svg_buffer = create_editable_svg(group_data)
-        if svg_buffer:
-            download_button_placeholder.download_button(
-                label="Download SVG",
-                data=svg_buffer,
-                file_name="storage_bay_design.svg",
-                mime="image/svg+xml",
-                type="primary",
-                help="Download the generated SVG file."
-            )
-        else:
-            st.error("Failed to generate SVG file. Please check configuration and try again.")
+        try:
+            fig = draw_bay_group(group_data)
+            st.pyplot(fig, use_container_width=True)
+        except Exception as e:
+            st.error(f"Error rendering preview: {str(e)}")
     else:
-        st.error("Cannot generate SVG due to configuration errors.")
+        st.error("Please resolve configuration errors to view the design.")
