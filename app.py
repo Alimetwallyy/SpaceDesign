@@ -5,23 +5,26 @@ import io
 import uuid
 import logging
 from time import sleep
+import pkg_resources
 
 # --- Configure Logging (suppressed in production) ---
 logging.basicConfig(level=logging.CRITICAL)
 logger = logging.getLogger(__name__)
 
-# --- Custom Theme ---
+# --- Custom Theme (with version check) ---
+st_version = pkg_resources.get_distribution("streamlit").version
+theme_config = {
+    "primaryColor": "#4A90E2",
+    "backgroundColor": "#F5F7FA",
+    "secondaryBackgroundColor": "#FFFFFF",
+    "textColor": "#2C3E50",
+    "font": "sans serif"
+} if st_version >= "1.47.0" else {}
 st.set_page_config(
     layout="wide",
     page_title="Storage Bay Designer",
     page_icon="📐",
-    theme={
-        "primaryColor": "#4A90E2",
-        "backgroundColor": "#F5F7FA",
-        "secondaryBackgroundColor": "#FFFFFF",
-        "textColor": "#2C3E50",
-        "font": "sans serif"
-    }
+    **theme_config
 )
 
 # --- Helper Functions ---
