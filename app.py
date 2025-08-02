@@ -8,9 +8,15 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
 import uuid
+import logging
+
+# --- Configure Logging (for debugging, suppressed in production) ---
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.CRITICAL)  # Suppress logs in production
 
 # --- Page Configuration ---
-st.set_page_config(layout="wide", page_title="Storage Bay Designer")
+st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
 
 # --- Helper Functions ---
 def hex_to_rgb(hex_color):
@@ -87,7 +93,7 @@ def draw_bay_group(params):
     dim_offset_x = 0.05 * core_width
     dim_offset_y = 0.05 * total_height
     
-    fig, ax = plt.subplots(figsize=(12, 12))
+    fig, ax = plt.subplots(figsize=(12, 8))
 
     # Draw Side Panels
     ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
@@ -124,7 +130,7 @@ def draw_bay_group(params):
         if i < len(bin_heights):
             net_bin_h = bin_heights[i]
             pitch_h = net_bin_h + shelf_thickness
-            pitch_top_y = shelf_bottom_y + pitch_h  # Define pitch_top_y
+            pitch_top_y = shelf_bottom_y + pitch_h
             level_name = chr(65 + i)
             
             bin_bottom_y = shelf_top_y
@@ -175,14 +181,15 @@ def create_summary_slide(prs, bay_groups):
     tf = title_shape.text_frame
     tf.text = "Bill of Materials"
     tf.paragraphs[0].font.size = Pt(24)
+    tf.paragraphs[0].font.bold = True
     
-    table_left, table_top, table_width, table_height = Inches(1), Inches(1), Inches(8), Inches(4)
+    table_left, table_top, table_width, table_height = Inches(0.5), Inches(1), Inches(9), Inches(4)
     table = slide.shapes.add_table(2 + len(bay_groups), 4, table_left, table_top, table_width, table_height).table
     
-    table.columns[0].width = Inches(2)
+    table.columns[0].width = Inches(2.5)
     table.columns[1].width = Inches(2)
     table.columns[2].width = Inches(2)
-    table.columns[3].width = Inches(2)
+    table.columns[3].width = Inches(2.5)
     
     headers = ["Group Name", "Side Panels", "Shelves", "Bin Dividers"]
     for col, header in enumerate(headers):
@@ -190,6 +197,7 @@ def create_summary_slide(prs, bay_groups):
         cell.text = header
         cell.text_frame.paragraphs[0].font.size = Pt(14)
         cell.text_frame.paragraphs[0].font.bold = True
+        cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
     
     total_side_panels = 0
     total_shelves = 0
@@ -205,6 +213,10 @@ def create_summary_slide(prs, bay_groups):
         table.cell(i, 2).text = str(shelves)
         table.cell(i, 3).text = str(dividers)
         
+        for col in range(4):
+            table.cell(i, col).text_frame.paragraphs[0].font.size = Pt(12)
+            table.cell(i, col).text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+        
         total_side_panels += side_panels
         total_shelves += shelves
         total_dividers += dividers
@@ -213,20 +225,29 @@ def create_summary_slide(prs, bay_groups):
     table.cell(len(bay_groups) + 1, 1).text = str(total_side_panels)
     table.cell(len(bay_groups) + 1, 2).text = str(total_shelves)
     table.cell(len(bay_groups) + 1, 3).text = str(total_dividers)
+    
+    for col in range(4):
+        table.cell(len(bay_groups) + 1, col).text_frame.paragraphs[0].font.size = Pt(12)
+        table.cell(len(bay_groups) + 1, col).text_frame.paragraphs[0].font.bold = True
+        table.cell(len(bay_groups) + 1, col).text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
 
 def create_editable_powerpoint(bay_groups):
     """Creates a PowerPoint presentation from bay group data using native shapes."""
     prs = Presentation()
+    prs.slide_width = Inches(10)
+    prs.slide_height = Inches(7.5)
     
     create_summary_slide(prs, bay_groups)
     
     for group_data in bay_groups:
+        logger.debug(f"Processing group: {group_data['name']}")
         slide = prs.slides.add_slide(prs.slide_layouts[6])
         
         title_shape = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.5))
         tf = title_shape.text_frame
-        tf.text = f"Design for: {group_data['name']}"
+        tf.text = f"Design: {group_data['name']}"
         tf.paragraphs[0].font.size = Pt(24)
+        tf.paragraphs[0].font.bold = True
         
         # Unpack Parameters
         num_bays = group_data['num_bays']
@@ -241,7 +262,7 @@ def create_editable_powerpoint(bay_groups):
         has_top_cap = group_data['has_top_cap']
         color_hex = group_data['color']
         bin_heights = group_data['bin_heights']
-        zoom_factor = group_data.get('zoom', 1.0)
+        zoom_factor = max(group_data.get('zoom', 1.0), 1.0)  # Ensure zoom is at least 1.0
         
         # Normalize visual thickness
         visual_shelf_thickness = min(shelf_thickness, 18.0)
@@ -249,50 +270,91 @@ def create_editable_powerpoint(bay_groups):
         visual_side_panel_thickness = max(side_panel_thickness, 10.0)
         
         # Define Drawing Area and Scale
-        canvas_left, canvas_top, canvas_width, canvas_height = Inches(1), Inches(1), Inches(8), Inches(5.5)
+        canvas_left, canvas_top, canvas_width, canvas_height = Inches(0.5), Inches(1), Inches(9), Inches(6)
         total_group_width = (num_bays * bay_width) + (2 * side_panel_thickness)
-        scale = min(canvas_width / total_group_width, canvas_height / total_height) * zoom_factor * 0.9  # Apply zoom and slight reduction for padding
+        scale = min(canvas_width / total_group_width, canvas_height / total_height) * zoom_factor * 0.85
+        scale = max(scale, 0.01)  # Prevent zero or negative scaling
         
         def pt_to_emu(points):
             return int(points * 12700)
         
         def add_shape(left_mm, top_mm, width_mm, height_mm, color_hex):
-            if left_mm < 0 or top_mm < 0 or width_mm <= 0 or height_mm <= 0 or scale <= 0:
+            """Add a shape with validation to prevent invalid dimensions."""
+            try:
+                if left_mm < 0 or top_mm < 0 or width_mm <= 0 or height_mm <= 0 or scale <= 0:
+                    logger.warning(f"Invalid shape parameters: left={left_mm}, top={top_mm}, width={width_mm}, height={height_mm}, scale={scale}")
+                    return None
+                left = canvas_left + (left_mm * scale)
+                top = canvas_top + ((total_height - height_mm - top_mm) * scale)
+                width = max(width_mm * scale, Inches(0.01))
+                height = max(height_mm * scale, Inches(0.01))
+                
+                # Ensure shape is within slide bounds
+                if left + width > prs.slide_width or top + height > prs.slide_height:
+                    logger.warning(f"Shape out of bounds: left={left}, top={top}, width={width}, height={height}")
+                    return None
+                
+                shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
+                shape.fill.background()  # Transparent fill
+                shape.line.color.rgb = RGBColor(*hex_to_rgb(color_hex))
+                shape.line.width = Pt(1.5)
+                logger.debug(f"Added shape: left={left}, top={top}, width={width}, height={height}")
+                return shape
+            except Exception as e:
+                logger.error(f"Error adding shape: {e}")
                 return None
-            left = canvas_left + (left_mm * scale)
-            top = canvas_top + ((total_height - height_mm - top_mm) * scale)  # Flip Y-axis for PowerPoint
-            width = max(width_mm * scale, Inches(0.05))
-            height = max(height_mm * scale, Inches(0.05))
-            shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
-            shape.fill.background()  # Transparent fill
-            shape.line.color.rgb = RGBColor(*hex_to_rgb(color_hex))
-            shape.line.width = Pt(1.5)  # Thicker border for visibility
-            return shape
         
         def add_dimension(start_x, start_y, end_x, end_y, text, is_vertical=False):
-            if start_x >= end_x and not is_vertical or start_y >= end_y and is_vertical:
-                return
-            line = slide.shapes.add_connector(1, start_x, start_y, end_x, end_y)
-            line.line.fill.solid()
-            line.line.fill.fore_color.rgb = RGBColor(0, 0, 0)
-            line.line.begin_arrow_type = 2
-            line.line.end_arrow_type = 2
-            
-            if is_vertical:
-                text_left = start_x + pt_to_emu(10)
-                text_top = start_y + (end_y - start_y) / 2
-                textbox = slide.shapes.add_textbox(text_left, text_top, Inches(0.5), Inches(0.5))
-                textbox.rotation = 270.0
-            else:
-                text_left = start_x + (end_x - start_x) / 2 - pt_to_emu(20)
-                text_top = start_y - pt_to_emu(20)
-                textbox = slide.shapes.add_textbox(text_left, text_top, Inches(1), Inches(0.5))
-            
-            p = textbox.text_frame.paragraphs[0]
-            p.text = text
-            p.font.size = Pt(10)
-            p.alignment = PP_ALIGN.CENTER
-            textbox.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+            """Add dimension line using shapes instead of connectors."""
+            try:
+                if is_vertical and start_y >= end_y or not is_vertical and start_x >= end_x:
+                    logger.warning(f"Invalid dimension line: start_x={start_x}, start_y={start_y}, end_x={end_x}, end_y={end_y}")
+                    return
+                
+                # Draw line
+                line_width = Inches(0.01)
+                if is_vertical:
+                    line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, start_x, start_y, line_width, end_y - start_y)
+                else:
+                    line = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, start_x, start_y, end_x - start_x, line_width)
+                line.fill.background()
+                line.line.color.rgb = RGBColor(0, 0, 0)
+                line.line.width = Pt(1)
+                
+                # Add arrows
+                arrow_size = Inches(0.1)
+                if is_vertical:
+                    top_arrow = slide.shapes.add_shape(MSO_SHAPE.UP_ARROW, start_x - arrow_size / 2, start_y, arrow_size, arrow_size)
+                    bottom_arrow = slide.shapes.add_shape(MSO_SHAPE.DOWN_ARROW, start_x - arrow_size / 2, end_y - arrow_size, arrow_size, arrow_size)
+                else:
+                    left_arrow = slide.shapes.add_shape(MSO_SHAPE.LEFT_ARROW, start_x, start_y - arrow_size / 2, arrow_size, arrow_size)
+                    right_arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, end_x - arrow_size, start_y - arrow_size / 2, arrow_size, arrow_size)
+                
+                for arrow in [top_arrow, bottom_arrow] if is_vertical else [left_arrow, right_arrow]:
+                    if arrow:
+                        arrow.fill.background()
+                        arrow.line.color.rgb = RGBColor(0, 0, 0)
+                        arrow.line.width = Pt(1)
+                
+                # Add text
+                if is_vertical:
+                    text_left = start_x + pt_to_emu(10)
+                    text_top = start_y + (end_y - start_y) / 2
+                    textbox = slide.shapes.add_textbox(text_left, text_top, Inches(0.5), Inches(0.5))
+                    textbox.rotation = 270.0
+                else:
+                    text_left = start_x + (end_x - start_x) / 2 - pt_to_emu(20)
+                    text_top = start_y - pt_to_emu(20)
+                    textbox = slide.shapes.add_textbox(text_left, text_top, Inches(1), Inches(0.5))
+                
+                p = textbox.text_frame.paragraphs[0]
+                p.text = text
+                p.font.size = Pt(10)
+                p.alignment = PP_ALIGN.CENTER
+                textbox.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+                logger.debug(f"Added dimension: {text}, is_vertical={is_vertical}")
+            except Exception as e:
+                logger.error(f"Error adding dimension: {e}")
         
         # Draw Structure
         structure_height = total_height - ground_clearance
@@ -314,7 +376,7 @@ def create_editable_powerpoint(bay_groups):
             for i in range(num_cols):
                 dim_start_x = canvas_left + (bin_start_x_mm + i * (bin_width + bin_split_thickness)) * scale
                 dim_end_x = dim_start_x + (bin_width * scale)
-                dim_y = canvas_top - pt_to_emu(20)
+                dim_y = canvas_top - pt_to_emu(30)
                 add_dimension(dim_start_x, dim_y, dim_end_x, dim_y, f"{bin_width:.1f} mm")
             
             current_x_mm += bay_width
@@ -343,14 +405,18 @@ def create_editable_powerpoint(bay_groups):
                 
                 # Add level label
                 level_name = chr(65 + i)
-                text_left = canvas_left - pt_to_emu(20)
+                text_left = canvas_left - pt_to_emu(30)
                 text_top = canvas_top + ((total_height - shelf_top_y - net_bin_h / 2) * scale)
-                textbox = slide.shapes.add_textbox(text_left, text_top, Inches(0.5), Inches(0.5))
-                p = textbox.text_frame.paragraphs[0]
-                p.text = level_name
-                p.font.size = Pt(12)
-                p.font.bold = True
-                p.alignment = PP_ALIGN.CENTER
+                try:
+                    textbox = slide.shapes.add_textbox(text_left, text_top, Inches(0.5), Inches(0.5))
+                    p = textbox.text_frame.paragraphs[0]
+                    p.text = level_name
+                    p.font.size = Pt(12)
+                    p.font.bold = True
+                    p.alignment = PP_ALIGN.CENTER
+                    logger.debug(f"Added level label: {level_name}")
+                except Exception as e:
+                    logger.error(f"Error adding level label {level_name}: {e}")
                 
                 current_y_mm += shelf_thickness + net_bin_h
         
@@ -358,16 +424,26 @@ def create_editable_powerpoint(bay_groups):
             add_shape(0, total_height - visual_shelf_thickness, total_group_width, visual_shelf_thickness, color_hex)
         
         # Add outer dimensions
-        total_w_y = canvas_top - pt_to_emu(40)
+        total_w_y = canvas_top - pt_to_emu(50)
         add_dimension(canvas_left, total_w_y, canvas_left + total_group_width * scale, total_w_y, f"Total Width: {total_group_width:.0f} mm")
         
-        total_h_x = canvas_left - pt_to_emu(60)
+        total_h_x = canvas_left - pt_to_emu(70)
         add_dimension(total_h_x, canvas_top, total_h_x, canvas_top + total_height * scale, f"Total Height: {total_height:.0f} mm", is_vertical=True)
     
     ppt_buf = io.BytesIO()
-    prs.save(ppt_buf)
-    ppt_buf.seek(0)
-    return ppt_buf
+    try:
+        prs.save(ppt_buf)
+        ppt_buf.seek(0)
+        if ppt_buf.getbuffer().nbytes == 0:
+            logger.error("Generated PPTX buffer is empty")
+            st.error("Failed to generate PPTX file: Empty buffer.")
+            return None
+        logger.debug(f"Generated PPTX buffer size: {ppt_buf.getbuffer().nbytes} bytes")
+        return ppt_buf
+    except Exception as e:
+        logger.error(f"Error saving PPTX: {e}")
+        st.error(f"Failed to generate PPTX file: {str(e)}")
+        return None
 
 # --- Initialize Session State ---
 if 'bay_groups' not in st.session_state:
@@ -387,7 +463,7 @@ if 'bay_groups' not in st.session_state:
         "color": "#4A90E2",
         "bin_heights": [350.0] * 5,
         "lock_heights": [False] * 5,
-        "zoom": 1.0
+        "zoom": 1.5  # Default to 1.5 for better visibility
     }]
 
 # Migrate existing groups
@@ -395,14 +471,19 @@ for group in st.session_state.bay_groups:
     if 'bin_split_thickness' not in group:
         group['bin_split_thickness'] = 18.0
     if 'zoom' not in group:
-        group['zoom'] = 1.0
+        group['zoom'] = 1.5
+
+# --- UI Enhancements ---
+st.title("Storage Bay Designer")
+st.markdown("Design and visualize storage bay configurations with real-time previews and generate editable PowerPoint outputs.")
 
 # --- Sidebar Controls ---
-st.sidebar.header("Manage Bay Groups")
+st.sidebar.header("Manage Bay Groups", divider="gray")
+st.sidebar.markdown("Create and configure storage bay groups below.")
 
 with st.sidebar.expander("Add New Group", expanded=True):
     with st.form("new_group_form"):
-        new_group_name = st.text_input("New Group Name", "New Group")
+        new_group_name = st.text_input("Group Name", "New Group", help="Enter a unique name for the bay group.")
         add_group_submitted = st.form_submit_button("Add Group")
         if add_group_submitted:
             if any(g['name'] == new_group_name for g in st.session_state.bay_groups):
@@ -412,17 +493,19 @@ with st.sidebar.expander("Add New Group", expanded=True):
                 new_group['id'] = str(uuid.uuid4())
                 new_group['name'] = new_group_name
                 st.session_state.bay_groups.append(new_group)
+                st.success(f"Added group: {new_group_name}")
                 st.rerun()
 
 if len(st.session_state.bay_groups) > 1:
-    if st.sidebar.button("Remove Last Group"):
-        st.session_state.bay_groups.pop()
+    if st.sidebar.button("Remove Last Group", help="Remove the most recently added group."):
+        removed_group = st.session_state.bay_groups.pop()
+        st.success(f"Removed group: {removed_group['name']}")
         st.rerun()
 
 st.sidebar.markdown("---")
 
 group_names = [g['name'] for g in st.session_state.bay_groups]
-selected_group_name = st.sidebar.selectbox("Select Group to Edit", group_names)
+selected_group_name = st.sidebar.selectbox("Select Group to Edit", group_names, help="Choose a group to modify its configuration.")
 active_group_idx = group_names.index(selected_group_name)
 group_data = st.session_state.bay_groups[active_group_idx]
 
@@ -450,16 +533,18 @@ def update_total_height():
 
 # --- Configuration Inputs ---
 with st.sidebar.expander("Structure", expanded=True):
-    group_data['num_bays'] = st.number_input("Number of Bays in Group", min_value=1, value=int(group_data['num_bays']), key=f"num_bays_{group_data['id']}")
-    group_data['bay_width'] = st.number_input("Width per Bay (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}")
-    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height)
-    group_data['ground_clearance'] = st.number_input("Ground Clearance (mm)", min_value=0.0, value=float(group_data['ground_clearance']), key=f"ground_clearance_{group_data['id']}", on_change=update_total_height)
-    group_data['has_top_cap'] = st.checkbox("Add Top Cap", value=group_data['has_top_cap'], key=f"has_top_cap_{group_data['id']}", on_change=update_total_height)
+    st.markdown("**Configure the bay group structure.**")
+    group_data['num_bays'] = st.number_input("Number of Bays", min_value=1, value=int(group_data['num_bays']), key=f"num_bays_{group_data['id']}", help="Number of bays in the group.")
+    group_data['bay_width'] = st.number_input("Width per Bay (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}", help="Width of each bay in millimeters.")
+    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height, help="Total height of the bay group.")
+    group_data['ground_clearance'] = st.number_input("Ground Clearance (mm)", min_value=0.0, value=float(group_data['ground_clearance']), key=f"ground_clearance_{group_data['id']}", on_change=update_total_height, help="Height from ground to first shelf.")
+    group_data['has_top_cap'] = st.checkbox("Include Top Cap", value=group_data['has_top_cap'], key=f"has_top_cap_{group_data['id']}", on_change=update_total_height, help="Add a top cap shelf.")
 
 with st.sidebar.expander("Layout", expanded=True):
+    st.markdown("**Configure the bay layout.**")
     prev_num_rows = group_data['num_rows']
-    group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height)
-    group_data['num_cols'] = st.number_input("Bin-Split (Columns)", min_value=1, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}")
+    group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows).")
+    group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns per bay.")
 
     if prev_num_rows != group_data['num_rows']:
         if group_data['num_rows'] > len(group_data['bin_heights']):
@@ -471,8 +556,9 @@ with st.sidebar.expander("Layout", expanded=True):
             group_data['lock_heights'] = group_data['lock_heights'][:group_data['num_rows']]
         update_total_height()
 
-with st.sidebar.expander("Individual Net Bin Heights", expanded=True):
-    auto_distribute = st.checkbox("Auto-distribute Heights", value=True, key=f"auto_distribute_{group_data['id']}")
+with st.sidebar.expander("Individual Bin Heights", expanded=True):
+    st.markdown("**Set individual bin heights.**")
+    auto_distribute = st.checkbox("Auto-distribute Heights", value=True, key=f"auto_distribute_{group_data['id']}", help="Automatically distribute height across unlocked bins.")
     
     current_bin_heights = []
     current_lock_heights = []
@@ -481,15 +567,16 @@ with st.sidebar.expander("Individual Net Bin Heights", expanded=True):
         col1, col2 = st.columns([3, 1])
         with col1:
             height = st.number_input(
-                f"Level {level_name} Net Height",
+                f"Level {level_name} Net Height (mm)",
                 min_value=1.0,
                 value=float(group_data['bin_heights'][j]),
                 key=f"level_{group_data['id']}_{j}",
                 disabled=auto_distribute and not group_data['lock_heights'][j],
-                on_change=update_total_height
+                on_change=update_total_height,
+                help=f"Net height for bin level {level_name}."
             )
         with col2:
-            locked = st.checkbox("Lock", value=group_data['lock_heights'][j], key=f"lock_{group_data['id']}_{j}", on_change=update_total_height)
+            locked = st.checkbox("Lock", value=group_data['lock_heights'][j], key=f"lock_{group_data['id']}_{j}", on_change=update_total_height, help="Lock this height to prevent auto-distribution.")
         current_bin_heights.append(height)
         current_lock_heights.append(locked)
     
@@ -501,69 +588,78 @@ with st.sidebar.expander("Individual Net Bin Heights", expanded=True):
         update_total_height()
 
 with st.sidebar.expander("Materials & Appearance", expanded=True):
+    st.markdown("**Customize materials and visual settings.**")
     group_data['shelf_thickness'] = st.number_input(
         "Shelf Thickness (mm)", 
         min_value=1.0, 
         value=float(group_data['shelf_thickness']), 
         key=f"shelf_thick_{group_data['id']}", 
-        on_change=update_total_height
+        on_change=update_total_height,
+        help="Thickness of shelves."
     )
     group_data['bin_split_thickness'] = st.number_input(
         "Bin Split Thickness (mm)", 
         min_value=1.0, 
         value=float(group_data['bin_split_thickness']), 
-        key=f"bin_split_thick_{group_data['id']}"
+        key=f"bin_split_thick_{group_data['id']}",
+        help="Thickness of bin dividers."
     )
     group_data['side_panel_thickness'] = st.number_input(
-        "Outer Side Panel Thickness (mm)", 
+        "Side Panel Thickness (mm)", 
         min_value=1.0, 
         value=float(group_data['side_panel_thickness']), 
-        key=f"side_panel_thick_{group_data['id']}"
+        key=f"side_panel_thick_{group_data['id']}",
+        help="Thickness of outer side panels."
     )
-    group_data['color'] = st.color_picker("Structure Color", value=group_data['color'], key=f"color_{group_data['id']}")
-    group_data['zoom'] = st.slider("Zoom", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}")
+    group_data['color'] = st.color_picker("Structure Color", value=group_data['color'], key=f"color_{group_data['id']}", help="Color of the bay structure.")
+    group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust zoom for preview and output.")
 
 # --- Validate Parameters ---
 errors = validate_group_params(group_data)
 if errors:
-    st.sidebar.error("Configuration Errors:\n" + "\n".join(f"- {e}" for e in errors))
+    st.sidebar.error("**Configuration Errors**\n" + "\n".join(f"- {e}" for e in errors))
 
 # --- Calculate and Display Final Height ---
 total_net_bin_h = sum(group_data['bin_heights'])
 num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
 total_shelf_h = num_shelves_for_calc * group_data['shelf_thickness']
 calculated_total_height = total_net_bin_h + total_shelf_h + group_data['ground_clearance']
-st.sidebar.metric("Calculated Total Height", f"{calculated_total_height:.1f} mm")
+st.sidebar.metric("Calculated Total Height", f"{calculated_total_height:.1f} mm", help="Sum of bin heights, shelf thicknesses, and ground clearance.")
 
 # --- Main Area for Drawing ---
-st.header(f"Generated Design for: {group_data['name']}")
+st.header(f"Design Preview: {group_data['name']}")
 if not errors:
-    fig = draw_bay_group(group_data)
-    st.pyplot(fig, use_container_width=True)
+    try:
+        fig = draw_bay_group(group_data)
+        st.pyplot(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Error rendering preview: {str(e)}")
 else:
-    st.error("Please fix configuration errors to view the design.")
+    st.error("Please resolve configuration errors to view the design.")
 
 # --- Global Download Button ---
 st.sidebar.markdown("---")
-st.sidebar.header("Download All Designs")
+st.sidebar.header("Export Designs", divider="gray")
 
 download_button_placeholder = st.sidebar.empty()
 
-if st.sidebar.button("Generate PPTX"):
+if st.sidebar.button("Generate PowerPoint", type="primary", help="Generate an editable PowerPoint file with all bay designs."):
     has_errors = False
     for group in st.session_state.bay_groups:
         if validate_group_params(group):
             has_errors = True
-            st.error(f"Cannot generate PPTX due to errors in group: {group['name']}")
+            st.error(f"Cannot generate PowerPoint due to errors in group: {group['name']}")
     
     if not has_errors:
         ppt_buffer = create_editable_powerpoint(st.session_state.bay_groups)
-        if ppt_buffer.getbuffer().nbytes > 0:
+        if ppt_buffer:
             download_button_placeholder.download_button(
-                label="Download Now",
+                label="Download PowerPoint",
                 data=ppt_buffer,
-                file_name="all_bay_designs.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                file_name="storage_bay_designs.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                type="primary",
+                help="Download the generated PowerPoint file."
             )
         else:
-            st.error("Failed to generate PPTX file.")
+            st.error("Failed to generate PowerPoint file. Please check configuration and try again.")
