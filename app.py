@@ -13,64 +13,71 @@ logger.info("Starting Storage Bay Designer app")
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
 
-# --- Custom CSS for Modern Look ---
+# --- Custom CSS for Professional Look ---
 st.markdown("""
 <style>
     .stApp {
-        background-color: #f5f5f5;
-        font-family: 'Helvetica', sans-serif;
+        background-color: #f9f9f9;
+        font-family: 'Arial', sans-serif;
     }
     .stSidebar {
         background-color: #ffffff;
         padding: 20px;
-        border-right: 1px solid #ddd;
+        border-right: 1px solid #ccc;
     }
     .stButton>button {
-        background-color: #2e7d32;
+        background-color: #1976d2;
         color: white;
-        border-radius: 5px;
+        border-radius: 4px;
         padding: 8px 16px;
         margin: 5px 0;
+        font-weight: 500;
     }
     .stButton>button:hover {
-        background-color: #1b5e20;
+        background-color: #1565c0;
     }
     .stNumberInput input, .stTextInput input {
         border-radius: 4px;
-        border: 1px solid #ccc;
+        border: 1px solid #bbb;
     }
     .stExpander {
         margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
     }
     .stExpander > div > div {
         padding: 10px;
     }
     .preview-container {
-        border: 1px solid #ddd;
-        border-radius: 5px;
+        border: 1px solid #bbb;
+        border-radius: 4px;
         padding: 10px;
         background-color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .metric-box {
-        background-color: #e8f5e9;
+        background-color: #e3f2fd;
         padding: 10px;
-        border-radius: 5px;
+        border-radius: 4px;
         margin: 10px 0;
+        font-size: 14px;
+        color: #1e88e5;
     }
     [data-theme="dark"] .stApp {
-        background-color: #212121;
+        background-color: #1e1e1e;
     }
     [data-theme="dark"] .stSidebar {
         background-color: #2c2c2c;
         border-right: 1px solid #444;
     }
     [data-theme="dark"] .preview-container {
-        background-color: #333;
+        background-color: #2c2c2c;
         border-color: #555;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     [data-theme="dark"] .metric-box {
-        background-color: #1b5e20;
-        color: white;
+        background-color: #103a6d;
+        color: #bbdefb;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -78,23 +85,23 @@ st.markdown("""
 # --- Helper Functions ---
 def draw_dimension_line(ax, x1, y1, x2, y2, text, is_vertical=False, offset=10, color='black', fontsize=8):
     """Draws a dimension line with arrows and text."""
-    ax.plot([x1, x2], [y1, y2], color=color, lw=1)
+    ax.plot([x1, x2], [y1, y2], color=color, lw=0.5, linestyle='--')
     if is_vertical:
-        ax.plot([x1, x1], [y1, y1 + 5], color=color, lw=1)
-        ax.plot([x2, x2], [y2, y2 - 5], color=color, lw=1)
-        ax.text(x1 + offset, (y1 + y2) / 2, text, va='center', ha='left', fontsize=fontsize, color=color)
+        ax.plot([x1, x1], [y1, y1 + 5], color=color, lw=0.5)
+        ax.plot([x2, x2], [y2, y2 - 5], color=color, lw=0.5)
+        ax.text(x1 + offset, (y1 + y2) / 2, text, va='center', ha='left', fontsize=fontsize, color=color, fontweight='bold')
     else:
-        ax.plot([x1, x1 + 5], [y1, y1], color=color, lw=1)
-        ax.plot([x2, x2 - 5], [y2, y2], color=color, lw=1)
-        ax.text((x1 + x2) / 2, y1 + offset, text, va='bottom', ha='center', fontsize=fontsize, color=color)
+        ax.plot([x1, x1 + 5], [y1, y1], color=color, lw=0.5)
+        ax.plot([x2, x2 - 5], [y2, y2], color=color, lw=0.5)
+        ax.text((x1 + x2) / 2, y1 + offset, text, va='bottom', ha='center', fontsize=fontsize, color=color, fontweight='bold')
 
 @st.cache_data
 def draw_bay_group(params):
-    """Draws a 2D bay design with clear dimensions."""
+    """Draws a professional 2D bay design with clear dimensions."""
     bay_width = params['bay_width']
     total_height = params['total_height']
     ground_clearance = params['ground_clearance']
-    depth = params['depth']
+    depth = params['depth']  # Fixed, not shown in bins
     shelf_thickness = params['shelf_thickness']
     side_thickness = params['side_panel_thickness']
     num_rows = params['num_rows']
@@ -104,18 +111,21 @@ def draw_bay_group(params):
     bin_counts = params['bin_counts_per_row']
     zoom = params.get('zoom', 1.0)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.set_facecolor('#f0f0f0')
+    fig, ax = plt.subplots(figsize=(12, 8), dpi=100)
+    ax.set_facecolor('#f5f5f5')
     ax.grid(False)
 
+    # Title block
+    ax.text(0.5, 1.02, "Storage Bay Design - Rev 1.0", transform=ax.transAxes, ha='center', va='bottom', fontsize=10, fontweight='bold', color='#424242')
+
     # Draw side panels and shelves
-    ax.add_patch(Rectangle((-side_thickness, 0), side_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
-    ax.add_patch(Rectangle((bay_width, 0), side_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
+    ax.add_patch(Rectangle((-side_thickness, 0), side_thickness, total_height, facecolor='#e0e0e0', edgecolor=color, lw=1.0))
+    ax.add_patch(Rectangle((bay_width, 0), side_thickness, total_height, facecolor='#e0e0e0', edgecolor=color, lw=1.0))
 
     current_y = ground_clearance
-    for i in range(min(num_rows, len(bin_heights))):  # Limit to available heights
+    for i in range(min(num_rows, len(bin_heights))):
         shelf_y = current_y
-        ax.add_patch(Rectangle((0, shelf_y), bay_width, shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
+        ax.add_patch(Rectangle((0, shelf_y), bay_width, shelf_thickness, facecolor='#d0d0d0', edgecolor=color, lw=1.0))
         bin_height = bin_heights[i]
         bin_y = shelf_y + shelf_thickness
         bin_top = bin_y + bin_height
@@ -125,27 +135,31 @@ def draw_bay_group(params):
         # Draw bins
         for j in range(num_bins):
             bin_x = j * bin_width
-            ax.add_patch(Rectangle((bin_x, bin_y), bin_width, bin_height, facecolor='#e0e0e0', edgecolor=color, lw=1, alpha=0.5))
-            # Dimension inside bin
-            ax.text(bin_x + bin_width / 2, bin_y + bin_height / 2, f"{bin_width:.0f}x{depth:.0f}",
-                    ha='center', va='center', fontsize=8, color='black', bbox=dict(facecolor='white', alpha=0.7))
+            ax.add_patch(Rectangle((bin_x, bin_y), bin_width, bin_height, facecolor='white', edgecolor=color, lw=0.8))
+            # Display height and width inside bin
+            ax.text(bin_x + bin_width / 2, bin_y + bin_height / 2, f"H: {bin_height:.0f}\nW: {bin_width:.0f}",
+                    ha='center', va='center', fontsize=8, color='black', bbox=dict(facecolor='white', alpha=0.9, edgecolor='none'))
 
         # Shelf height dimension
-        draw_dimension_line(ax, bay_width + side_thickness + 10, bin_y, bay_width + side_thickness + 10, bin_top,
-                          f"{bin_height:.0f}", True, 5, '#2196F3')
+        draw_dimension_line(ax, bay_width + side_thickness + 15, bin_y, bay_width + side_thickness + 15, bin_top,
+                          f"{bin_height:.0f} mm", True, 5, '#1976d2')
 
         current_y = bin_top
 
     if has_top_cap:
-        ax.add_patch(Rectangle((0, total_height - shelf_thickness), bay_width, shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
+        ax.add_patch(Rectangle((0, total_height - shelf_thickness), bay_width, shelf_thickness, facecolor='#d0d0d0', edgecolor=color, lw=1.0))
 
     # Overall dimensions
-    draw_dimension_line(ax, -side_thickness - 10, 0, bay_width + side_thickness + 10, 0, f"Width: {bay_width + 2 * side_thickness:.0f}", False, 5, 'black')
-    draw_dimension_line(ax, -side_thickness - 20, 0, -side_thickness - 20, total_height, f"Height: {total_height:.0f}", True, 5, 'black')
-    draw_dimension_line(ax, -side_thickness - 30, 0, -side_thickness - 30, depth, f"Depth: {depth:.0f}", True, 5, 'black')
+    draw_dimension_line(ax, -side_thickness - 15, 0, bay_width + side_thickness + 15, 0, f"Width: {bay_width + 2 * side_thickness:.0f} mm", False, 5, 'black')
+    draw_dimension_line(ax, -side_thickness - 25, 0, -side_thickness - 25, total_height, f"Height: {total_height:.0f} mm", True, 5, 'black')
+
+    # Scale indicator
+    scale_length = 500  # 500 mm scale
+    ax.plot([0, scale_length / 10], [-10, -10], color='black', lw=1.0)
+    ax.text(scale_length / 20, -15, "500 mm", ha='center', va='top', fontsize=8, color='black')
 
     ax.set_xlim(-side_thickness * 2 - 30, bay_width + side_thickness * 2 + 30)
-    ax.set_ylim(-10, max(total_height, depth) + 10)
+    ax.set_ylim(-20, total_height + 20)
     ax.axis('off')
     return fig
 
@@ -179,7 +193,6 @@ def update_bin_counts():
     elif new_rows < current_rows:
         group_data['bin_counts_per_row'] = group_data['bin_counts_per_row'][:new_rows]
         group_data['bin_heights'] = group_data['bin_heights'][:new_rows]
-    # Ensure UI loop won't exceed list length
     group_data['num_rows'] = min(new_rows, len(group_data['bin_heights']))
 
 def update_total_height():
@@ -192,14 +205,14 @@ if 'bay_group' not in st.session_state:
         "id": str(uuid.uuid4()),
         "name": "Bay Design",
         "bay_width": 1050.0,
-        "total_height": 2000.0,  # Will be recalculated
+        "total_height": 2000.0,
         "ground_clearance": 50.0,
         "depth": 600.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
         "num_rows": 3,
         "has_top_cap": True,
-        "color": "#2196F3",
+        "color": "#1976d2",
         "bin_heights": [650.0, 650.0, 650.0],
         "bin_counts_per_row": [3, 3, 3],
         "zoom": 1.0
@@ -242,14 +255,14 @@ with st.sidebar:
             "id": str(uuid.uuid4()),
             "name": "Bay Design",
             "bay_width": 1050.0,
-            "total_height": 2000.0,  # Will be recalculated
+            "total_height": 2000.0,
             "ground_clearance": 50.0,
             "depth": 600.0,
             "shelf_thickness": 18.0,
             "side_panel_thickness": 18.0,
             "num_rows": 3,
             "has_top_cap": True,
-            "color": "#2196F3",
+            "color": "#1976d2",
             "bin_heights": [650.0, 650.0, 650.0],
             "bin_counts_per_row": [3, 3, 3],
             "zoom": 1.0
@@ -283,5 +296,5 @@ with st.sidebar:
     export_format = st.selectbox("Format", ["svg", "png", "pdf"], key="export_format")
     if st.button("Download Design"):
         with st.spinner(f"Generating {export_format.upper()}..."):
-            export_buf, filename, mime_type = create_editable_export(group_data, export_format)
+            export_buf, filename, mime_type = create_editable_export(group_data, format_type)
             st.download_button(label=f"Download {export_format.upper()}", data=export_buf, file_name=filename, mime=mime_type)
