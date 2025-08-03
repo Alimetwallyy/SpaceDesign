@@ -253,9 +253,9 @@ if 'bay_group' not in st.session_state:
         "bin_counts_per_row": [3] * 3,
         "zoom": 1.5
     }
-update_bin_counts()  # Ensure bin_counts_per_row is synced on startup
 
 group_data = st.session_state.bay_group
+update_bin_counts()  # Sync bin_counts_per_row after group_data is assigned
 
 def distribute_total_height():
     num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
