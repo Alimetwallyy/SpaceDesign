@@ -234,6 +234,30 @@ def create_editable_export(bay_group, format_type):
     
     return export_buf, filename, mime_type
 
+def update_bin_counts():
+    if len(group_data['bin_counts_per_row']) != group_data['num_rows']:
+        if group_data['num_rows'] > len(group_data['bin_counts_per_row']):
+            group_data['bin_counts_per_row'].extend([3] * (group_data['num_rows'] - len(group_data['bin_counts_per_row'])))
+        else:
+            group_data['bin_counts_per_row'] = group_data['bin_counts_per_row'][:group_data['num_rows']]
+
+def distribute_total_height():
+    num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
+    total_shelf_thickness = num_shelves_for_calc * group_data['shelf_thickness']
+    available_space = group_data['total_height'] - group_data['ground_clearance'] - total_shelf_thickness
+    unlocked_indices = [i for i, locked in enumerate(group_data['lock_heights']) if not locked]
+    num_unlocked = len(unlocked_indices)
+    if available_space > 0 and num_unlocked > 0:
+        uniform_net_h = available_space / num_unlocked
+        for i in unlocked_indices:
+            group_data['bin_heights'][i] = uniform_net_h
+
+def update_total_height():
+    num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
+    total_shelf_h = num_shelves_for_calc * group_data['shelf_thickness']
+    total_net_bin_h = sum(group_data['bin_heights'])
+    group_data['total_height'] = total_net_bin_h + total_shelf_h + group_data['ground_clearance']
+
 # --- Initialize Session State ---
 if 'bay_group' not in st.session_state:
     st.session_state.bay_group = {
@@ -256,30 +280,6 @@ if 'bay_group' not in st.session_state:
 
 group_data = st.session_state.bay_group
 update_bin_counts()  # Sync bin_counts_per_row after group_data is assigned
-
-def distribute_total_height():
-    num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
-    total_shelf_thickness = num_shelves_for_calc * group_data['shelf_thickness']
-    available_space = group_data['total_height'] - group_data['ground_clearance'] - total_shelf_thickness
-    unlocked_indices = [i for i, locked in enumerate(group_data['lock_heights']) if not locked]
-    num_unlocked = len(unlocked_indices)
-    if available_space > 0 and num_unlocked > 0:
-        uniform_net_h = available_space / num_unlocked
-        for i in unlocked_indices:
-            group_data['bin_heights'][i] = uniform_net_h
-
-def update_total_height():
-    num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
-    total_shelf_h = num_shelves_for_calc * group_data['shelf_thickness']
-    total_net_bin_h = sum(group_data['bin_heights'])
-    group_data['total_height'] = total_net_bin_h + total_shelf_h + group_data['ground_clearance']
-
-def update_bin_counts():
-    if len(group_data['bin_counts_per_row']) != group_data['num_rows']:
-        if group_data['num_rows'] > len(group_data['bin_counts_per_row']):
-            group_data['bin_counts_per_row'].extend([3] * (group_data['num_rows'] - len(group_data['bin_counts_per_row'])))
-        else:
-            group_data['bin_counts_per_row'] = group_data['bin_counts_per_row'][:group_data['num_rows']]
 
 # --- UI and Logic ---
 st.title("Storage Bay Designer")
