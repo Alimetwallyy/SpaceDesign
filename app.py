@@ -196,22 +196,34 @@ def draw_bay_group(params):
     ax.set_aspect('equal', adjustable='box')
     padding_x = core_width * 0.4 + visual_side_panel_thickness
     ax.set_xlim((-padding_x) * zoom_factor, (core_width + padding_x) * zoom_factor)
-    ax.set_ylim(-dim_offset_y * 5 * zoom_factor, total_height + dim_offset_y * 2 * zoom_factor)  # Adjusted y-limit to accommodate new dimension
+    ax.set_ylim(-dim_offset_y * 5 * zoom_factor, total_height + dim_offset_y * 2 * zoom_factor)
     ax.axis('off')
     
     return fig
 
-def create_editable_svg(bay_group):
-    """Creates an SVG file from bay group data using Matplotlib."""
-    logger.debug(f"Processing group: {bay_group['name']}")
+def create_editable_export(bay_group, format_type):
+    """Creates an export file (SVG, PNG, or PDF) from bay group data using Matplotlib."""
+    logger.debug(f"Processing group: {bay_group['name']} in {format_type} format")
     fig = draw_bay_group(bay_group)
     
-    svg_buf = io.BytesIO()
-    fig.savefig(svg_buf, format='svg', bbox_inches='tight', pad_inches=0.1)
-    plt.close(fig)
-    svg_buf.seek(0)
+    export_buf = io.BytesIO()
+    if format_type == 'svg':
+        fig.savefig(export_buf, format='svg', bbox_inches='tight', pad_inches=0.1)
+        filename = "storage_bay_design.svg"
+        mime_type = "image/svg+xml"
+    elif format_type == 'png':
+        fig.savefig(export_buf, format='png', bbox_inches='tight', pad_inches=0.1, dpi=300)
+        filename = "storage_bay_design.png"
+        mime_type = "image/png"
+    elif format_type == 'pdf':
+        fig.savefig(export_buf, format='pdf', bbox_inches='tight', pad_inches=0.1)
+        filename = "storage_bay_design.pdf"
+        mime_type = "application/pdf"
     
-    return svg_buf
+    plt.close(fig)
+    export_buf.seek(0)
+    
+    return export_buf, filename, mime_type
 
 # --- Initialize Session State ---
 if 'bay_group' not in st.session_state:
@@ -254,14 +266,14 @@ def update_total_height():
 
 # --- UI and Logic ---
 st.title("Storage Bay Designer")
-st.markdown("Design a single storage bay with real-time previews and download as an editable SVG.")
+st.markdown("Design a single storage bay with real-time previews and download as an editable file.")
 
 # Sidebar Introduction
 st.sidebar.markdown("""
 **How to Use**  
 1. Configure the bay’s dimensions and layout below.  
 2. View the real-time preview on the right.  
-3. Download an SVG file when satisfied with the design.
+3. Download a file when satisfied with the design.
 """)
 
 # Reset Button
@@ -398,7 +410,7 @@ with st.sidebar.expander("Bin Height Settings", expanded=False):
 
 with st.sidebar.expander("Advanced Settings", expanded=False):
     st.markdown("**Adjust advanced visual settings.**")
-    group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust the zoom level for the preview and SVG output.")
+    group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust the zoom level for the preview and export.")
 
 # Calculated Height Metric
 total_net_bin_h = sum(group_data['bin_heights'])
@@ -426,20 +438,21 @@ with col2:
 
 # SVG Download
 st.sidebar.header("Export Design", divider="gray")
-if st.sidebar.button("Download SVG", type="primary", help="Download an editable SVG file for the bay design."):
+export_format = st.selectbox("Export Format", ["svg", "png", "pdf"], index=0, help="Choose the file format for export.")
+if st.sidebar.button("Download File", type="primary", help="Download the bay design in the selected format."):
     if not errors:
-        with st.spinner("Generating SVG..."):
-            svg_buffer = create_editable_svg(group_data)
-            if svg_buffer:
+        with st.spinner(f"Generating {export_format.upper()}..."):
+            export_buffer, filename, mime_type = create_editable_export(group_data, export_format)
+            if export_buffer:
                 st.sidebar.download_button(
-                    label="Download SVG File",
-                    data=svg_buffer,
-                    file_name="storage_bay_design.svg",
-                    mime="image/svg+xml",
+                    label=f"Download {export_format.upper()} File",
+                    data=export_buffer,
+                    file_name=filename,
+                    mime=mime_type,
                     type="primary",
-                    help="Download the generated SVG file."
+                    help=f"Download the generated {export_format.upper()} file."
                 )
             else:
-                st.sidebar.error("Failed to generate SVG file. Please check configuration.")
+                st.sidebar.error(f"Failed to generate {export_format.upper()} file. Please check configuration.")
     else:
-        st.sidebar.error("Cannot generate SVG due to configuration errors.")
+        st.sidebar.error("Cannot generate file due to configuration errors.")
