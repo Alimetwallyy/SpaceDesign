@@ -5,10 +5,51 @@ import io
 import uuid
 import logging
 
-# --- Configure Logging (suppressed in production) ---
+# --- Configure Logging ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.info("Starting Storage Bay Designer app")
+
+# --- Custom CSS for Improved Styling ---
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #f5f5f5;
+        font-family: 'Arial', sans-serif;
+    }
+    .stButton>button {
+        background-color: #4A90E2;
+        color: white;
+        border-radius: 5px;
+        padding: 10px 20px;
+    }
+    .stButton>button:hover {
+        background-color: #357ABD;
+    }
+    .stSidebar .stNumberInput input, .stSidebar .stTextInput input {
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    .stError, .error-container {
+        background-color: #ffe6e6;
+        border-left: 4px solid #ff4d4d;
+        padding: 10px;
+        border-radius: 4px;
+        color: #d8000c;
+    }
+    h1, h2, h3 {
+        color: #333;
+    }
+    .stSidebar .stMarkdown {
+        color: #333;
+    }
+    .stMetric {
+        background-color: #e6f3ff;
+        padding: 10px;
+        border-radius: 4px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
@@ -19,7 +60,7 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-def draw_dimension_line(ax, x1, y1, x2, y2, text, is_vertical=False, offset=10, color='black', fontsize=9):
+def draw_dimension_line(ax, x1, y1, x2, y2, text, is_vertical=False, offset=10, color='black', fontsize=12):
     """Draws a dimension line with arrows and text on the matplotlib axis."""
     ax.plot([x1, x2], [y1, y2], color=color, lw=1)
     if is_vertical:
@@ -78,7 +119,8 @@ def draw_bay_group(params):
     dim_offset_x = 0.05 * core_width
     dim_offset_y = 0.05 * total_height
     
-    fig, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=(8, 6))  # Reduced for mobile compatibility
+    ax.grid(True, linestyle='--', alpha=0.2)  # Subtle grid for better visuals
 
     ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
     ax.add_patch(patches.Rectangle((core_width, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
@@ -108,8 +150,8 @@ def draw_bay_group(params):
             
             bin_bottom_y = shelf_top_y
             bin_top_y = bin_bottom_y + net_bin_h
-            draw_dimension_line(ax, core_width + visual_side_panel_thickness + dim_offset_x, bin_bottom_y, core_width + visual_side_panel_thickness + dim_offset_x, bin_top_y, f"{net_bin_h:.1f}", is_vertical=True, offset=5, color='#3b82f6')
-            draw_dimension_line(ax, core_width + visual_side_panel_thickness + pitch_offset_x, shelf_bottom_y, core_width + visual_side_panel_thickness + pitch_offset_x, pitch_top_y, f"{pitch_h:.1f}", is_vertical=True, offset=5, color='black')
+            draw_dimension_line(ax, core_width + visual_side_panel_thickness + dim_offset_x, bin_bottom_y, core_width + visual_side_panel_thickness + dim_offset_x, bin_top_y, f"{net_bin_h:.1f}", is_vertical=True, offset=5, color='#3b82f6', fontsize=12)
+            draw_dimension_line(ax, core_width + visual_side_panel_thickness + pitch_offset_x, shelf_bottom_y, core_width + visual_side_panel_thickness + pitch_offset_x, pitch_top_y, f"{pitch_h:.1f}", is_vertical=True, offset=5, color='black', fontsize=12)
 
             ax.text(-visual_side_panel_thickness - dim_offset_x, (bin_bottom_y + bin_top_y) / 2, level_name, va='center', ha='center', fontsize=12, fontweight='bold')
             
@@ -119,10 +161,10 @@ def draw_bay_group(params):
         ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, total_height - visual_shelf_thickness), total_group_width, visual_shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
 
     # Add Ground Clearance dimension
-    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), ground_clearance, f"Ground Clearance: {ground_clearance:.0f} mm", is_vertical=True, offset=10)
+    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), ground_clearance, f"Ground Clearance: {ground_clearance:.0f} mm", is_vertical=True, offset=10, fontsize=12)
 
-    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 2, core_width + visual_side_panel_thickness, -dim_offset_y * 2, f"Total Group Width: {total_group_width:.0f} mm", offset=10)
-    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10)
+    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 2, core_width + visual_side_panel_thickness, -dim_offset_y * 2, f"Total Group Width: {total_group_width:.0f} mm", offset=10, fontsize=12)
+    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10, fontsize=12)
 
     if num_cols > 0:
         dim_y_pos = total_height + dim_offset_y
@@ -130,7 +172,7 @@ def draw_bay_group(params):
         for i in range(num_cols):
             dim_start_x = bin_start_x + (i * bin_width)
             dim_end_x = dim_start_x + bin_width
-            draw_dimension_line(ax, dim_start_x, dim_y_pos, dim_end_x, dim_y_pos, f"{bin_width:.1f}", offset=10, color='#3b82f6')
+            draw_dimension_line(ax, dim_start_x, dim_y_pos, dim_end_x, dim_y_pos, f"{bin_width:.1f}", offset=10, color='#3b82f6', fontsize=12)
 
     ax.set_aspect('equal', adjustable='box')
     padding_x = core_width * 0.4 + visual_side_panel_thickness
@@ -157,7 +199,7 @@ if 'bay_group' not in st.session_state:
     st.session_state.bay_group = {
         "id": str(uuid.uuid4()),
         "name": "Bay Design",
-        "num_bays": 1,  # Fixed to 1
+        "num_bays": 1,
         "bay_width": 1050.0,
         "total_height": 2000.0,
         "ground_clearance": 50.0,
@@ -193,22 +235,117 @@ def update_total_height():
 
 # --- UI and Logic ---
 st.title("Storage Bay Designer")
-st.markdown("Design and visualize a single storage bay with real-time previews and generate an editable SVG output.")
+st.markdown("Design a single storage bay with real-time previews and download as an editable SVG.")
 
+# Sidebar Introduction
+st.sidebar.markdown("""
+**How to Use**  
+1. Configure the bay’s dimensions and layout below.  
+2. View the real-time preview on the right.  
+3. Download an SVG file when satisfied with the design.
+""")
+
+# Reset Button
+if st.sidebar.button("Reset to Defaults", help="Reset all settings to default values."):
+    st.session_state.bay_group = {
+        "id": str(uuid.uuid4()),
+        "name": "Bay Design",
+        "num_bays": 1,
+        "bay_width": 1050.0,
+        "total_height": 2000.0,
+        "ground_clearance": 50.0,
+        "shelf_thickness": 18.0,
+        "side_panel_thickness": 18.0,
+        "num_cols": 4,
+        "num_rows": 5,
+        "has_top_cap": True,
+        "color": "#4A90E2",
+        "bin_heights": [350.0] * 5,
+        "lock_heights": [False] * 5,
+        "zoom": 1.5
+    }
+    st.experimental_rerun()
+
+# Quick Presets
+st.sidebar.header("Quick Presets", divider="gray")
+col1, col2, col3 = st.sidebar.columns(3)
+with col1:
+    if st.button("Small Bay"):
+        group_data.update({
+            "bay_width": 600.0,
+            "total_height": 1200.0,
+            "num_rows": 3,
+            "num_cols": 2,
+            "bin_heights": [350.0] * 3,
+            "lock_heights": [False] * 3,
+            "ground_clearance": 50.0,
+            "shelf_thickness": 18.0,
+            "side_panel_thickness": 18.0,
+            "has_top_cap": True,
+            "color": "#4A90E2",
+            "zoom": 1.5
+        })
+        update_total_height()
+        st.experimental_rerun()
+with col2:
+    if st.button("Medium Bay"):
+        group_data.update({
+            "bay_width": 1050.0,
+            "total_height": 2000.0,
+            "num_rows": 5,
+            "num_cols": 4,
+            "bin_heights": [350.0] * 5,
+            "lock_heights": [False] * 5,
+            "ground_clearance": 50.0,
+            "shelf_thickness": 18.0,
+            "side_panel_thickness": 18.0,
+            "has_top_cap": True,
+            "color": "#4A90E2",
+            "zoom": 1.5
+        })
+        update_total_height()
+        st.experimental_rerun()
+with col3:
+    if st.button("Large Bay"):
+        group_data.update({
+            "bay_width": 1500.0,
+            "total_height": 3000.0,
+            "num_rows": 7,
+            "num_cols": 6,
+            "bin_heights": [400.0] * 7,
+            "lock_heights": [False] * 7,
+            "ground_clearance": 50.0,
+            "shelf_thickness": 18.0,
+            "side_panel_thickness": 18.0,
+            "has_top_cap": True,
+            "color": "#4A90E2",
+            "zoom": 1.5
+        })
+        update_total_height()
+        st.experimental_rerun()
+
+# Error Display
+errors = validate_group_params(group_data)
+if errors:
+    st.sidebar.markdown("<div class='error-container'>**Configuration Errors**</div>", unsafe_allow_html=True)
+    for e in errors:
+        st.sidebar.markdown(f"<div class='error-container'>• {e}</div>", unsafe_allow_html=True)
+
+# Sidebar Configuration
 st.sidebar.header("Configure Bay Design", divider="gray")
-st.sidebar.markdown("Customize your storage bay below.")
+with st.sidebar.expander("Bay Configuration", expanded=False):
+    st.markdown("**Set bay dimensions and materials.**")
+    group_data['ground_clearance'] = st.number_input("Ground Clearance (mm)", min_value=0.0, value=float(group_data['ground_clearance']), key=f"ground_clearance_{group_data['id']}", on_change=update_total_height, help="Height from ground to the first shelf.")
+    group_data['has_top_cap'] = st.checkbox("Include Top Cap", value=group_data['has_top_cap'], key=f"has_top_cap_{group_data['id']}", on_change=update_total_height, help="Add a top cap shelf to the bay.")
+    group_data['shelf_thickness'] = st.number_input("Shelf Thickness (mm)", min_value=1.0, value=float(group_data['shelf_thickness']), key=f"shelf_thick_{group_data['id']}", on_change=update_total_height, help="Thickness of each shelf.")
+    group_data['side_panel_thickness'] = st.number_input("Side Panel Thickness (mm)", min_value=1.0, value=float(group_data['side_panel_thickness']), key=f"side_panel_thick_{group_data['id']}", help="Thickness of the outer side panels.")
+    group_data['color'] = st.color_picker("Structure Color", value=group_data['color'], key=f"color_{group_data['id']}", help="Color of the bay structure in the preview.")
+    group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust the zoom level for the preview and SVG output.")
 
-with st.sidebar.expander("Structure", expanded=True):
-    st.markdown("**Configure the bay structure.**")
-    group_data['bay_width'] = st.number_input("Bay Width (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}", help="Width of the bay in millimeters.")
-    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height, help="Total height of the bay.")
-    group_data['ground_clearance'] = st.number_input("Ground Clearance (mm)", min_value=0.0, value=float(group_data['ground_clearance']), key=f"ground_clearance_{group_data['id']}", on_change=update_total_height, help="Height from ground to first shelf.")
-    group_data['has_top_cap'] = st.checkbox("Include Top Cap", value=group_data['has_top_cap'], key=f"has_top_cap_{group_data['id']}", on_change=update_total_height, help="Add a top cap shelf.")
-
-with st.sidebar.expander("Layout", expanded=True):
+with st.sidebar.expander("Layout", expanded=False):
     st.markdown("**Configure the bay layout.**")
     prev_num_rows = group_data['num_rows']
-    group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows).")
+    group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows) in the bay.")
     group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns in the bay.")
 
     if prev_num_rows != group_data['num_rows']:
@@ -221,95 +358,63 @@ with st.sidebar.expander("Layout", expanded=True):
             group_data['lock_heights'] = group_data['lock_heights'][:group_data['num_rows']]
         update_total_height()
 
-with st.sidebar.expander("Individual Bin Heights", expanded=True):
-    st.markdown("**Set individual bin heights.**")
-    auto_distribute = st.checkbox("Auto-distribute Heights", value=True, key=f"auto_distribute_{group_data['id']}", help="Automatically distribute height across unlocked bins.")
-    
-    current_bin_heights = []
-    current_lock_heights = []
-    for j in range(group_data['num_rows']):
-        level_name = chr(65 + j)
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            height = st.number_input(
-                f"Level {level_name} Net Height (mm)",
-                min_value=1.0,
-                value=float(group_data['bin_heights'][j]),
-                key=f"level_{group_data['id']}_{j}",
-                disabled=auto_distribute and not group_data['lock_heights'][j],
-                on_change=update_total_height,
-                help=f"Net height for bin level {level_name}."
-            )
-        with col2:
-            locked = st.checkbox("Lock", value=group_data['lock_heights'][j], key=f"lock_{group_data['id']}_{j}", on_change=update_total_height, help="Lock this height to prevent auto-distribution.")
-        current_bin_heights.append(height)
-        current_lock_heights.append(locked)
-    
-    group_data['bin_heights'] = current_bin_heights
-    group_data['lock_heights'] = current_lock_heights
-    if auto_distribute:
-        distribute_total_height()
+with st.sidebar.expander("Bin Height Settings", expanded=False):
+    st.markdown("**Configure bin heights.**")
+    auto_distribute = st.checkbox("Auto-distribute Heights", value=True, key=f"auto_distribute_{group_data['id']}", help="Automatically distribute available height evenly across bins.")
+    if not auto_distribute:
+        heights_input = st.text_input("Bin Heights (mm, comma-separated)", value=",".join(str(h) for h in group_data['bin_heights']), key=f"heights_{group_data['id']}", help="Enter heights for each level, e.g., 350,350,350")
+        try:
+            group_data['bin_heights'] = [float(h) for h in heights_input.split(",") if h.strip()]
+            if len(group_data['bin_heights']) != group_data['num_rows']:
+                st.error(f"Number of heights ({len(group_data['bin_heights'])}) must match number of rows ({group_data['num_rows']}).")
+            else:
+                group_data['lock_heights'] = [False] * len(group_data['bin_heights'])
+                update_total_height()
+        except ValueError:
+            st.error("Invalid height format. Use comma-separated numbers (e.g., 350,350,350).")
     else:
-        update_total_height()
+        distribute_total_height()
 
-with st.sidebar.expander("Materials & Appearance", expanded=True):
-    st.markdown("**Customize materials and visual settings.**")
-    group_data['shelf_thickness'] = st.number_input(
-        "Shelf Thickness (mm)", 
-        min_value=1.0, 
-        value=float(group_data['shelf_thickness']), 
-        key=f"shelf_thick_{group_data['id']}", 
-        on_change=update_total_height,
-        help="Thickness of shelves."
-    )
-    group_data['side_panel_thickness'] = st.number_input(
-        "Side Panel Thickness (mm)", 
-        min_value=1.0, 
-        value=float(group_data['side_panel_thickness']), 
-        key=f"side_panel_thick_{group_data['id']}",
-        help="Thickness of outer side panels."
-    )
-    group_data['color'] = st.color_picker("Structure Color", value=group_data['color'], key=f"color_{group_data['id']}", help="Color of the bay structure.")
-    group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust zoom for preview and output.")
-
-errors = validate_group_params(group_data)
-if errors:
-    st.sidebar.error("**Configuration Errors**\n" + "\n".join(f"- {e}" for e in errors))
-
+# Calculated Height Metric
 total_net_bin_h = sum(group_data['bin_heights'])
 num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
 total_shelf_h = num_shelves_for_calc * group_data['shelf_thickness']
 calculated_total_height = total_net_bin_h + total_shelf_h + group_data['ground_clearance']
 st.sidebar.metric("Calculated Total Height", f"{calculated_total_height:.1f} mm", help="Sum of bin heights, shelf thicknesses, and ground clearance.")
 
-st.header(f"Design Preview: {group_data['name']}")
-if not errors:
-    try:
-        fig = draw_bay_group(group_data)
-        st.pyplot(fig, use_container_width=True)
-    except Exception as e:
-        st.error(f"Error rendering preview: {str(e)}")
-else:
-    st.error("Please resolve configuration errors to view the design.")
+# Main Area Layout
+col1, col2 = st.columns([1, 2])
+with col1:
+    st.header("Key Settings")
+    group_data['bay_width'] = st.number_input("Bay Width (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}", help="Width of the bay in millimeters.")
+    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height, help="Total height of the bay.")
 
-st.sidebar.markdown("---")
+with col2:
+    st.header(f"Design Preview: {group_data['name']}")
+    show_preview = st.checkbox("Show Live Preview", value=True, help="Toggle real-time design preview to improve performance.")
+    if show_preview and not errors:
+        with st.spinner("Rendering preview..."):
+            fig = draw_bay_group(group_data)
+            st.pyplot(fig, use_container_width=True)
+    elif errors:
+        st.error("Please resolve configuration errors to view the design.")
+
+# SVG Download
 st.sidebar.header("Export Design", divider="gray")
-
-download_button_placeholder = st.sidebar.empty()
-
-if st.sidebar.button("Generate SVG", type="primary", help="Generate an editable SVG file for the bay design."):
+if st.sidebar.button("Download SVG", type="primary", help="Download an editable SVG file for the bay design."):
     if not errors:
-        svg_buffer = create_editable_svg(group_data)
-        if svg_buffer:
-            download_button_placeholder.download_button(
-                label="Download SVG",
-                data=svg_buffer,
-                file_name="storage_bay_design.svg",
-                mime="image/svg+xml",
-                type="primary",
-                help="Download the generated SVG file."
-            )
-        else:
-            st.error("Failed to generate SVG file. Please check configuration and try again.")
+        with st.spinner("Generating SVG..."):
+            svg_buffer = create_editable_svg(group_data)
+            if svg_buffer:
+                st.sidebar.download_button(
+                    label="Download SVG File",
+                    data=svg_buffer,
+                    file_name="storage_bay_design.svg",
+                    mime="image/svg+xml",
+                    type="primary",
+                    help="Download the generated SVG file."
+                )
+            else:
+                st.sidebar.error("Failed to generate SVG file. Please check configuration.")
     else:
-        st.error("Cannot generate SVG due to configuration errors.")
+        st.sidebar.error("Cannot generate SVG due to configuration errors.")
