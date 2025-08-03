@@ -125,7 +125,7 @@ def draw_bay_group(params):
 
     core_width = bay_width
     total_group_width = core_width + (2 * side_panel_thickness)
-    dim_offset_x = 0.05 * core_width
+    dim_offset_x = 0.1 * core_width  # Increased for better spacing
     dim_offset_y = 0.05 * total_height
     
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -146,6 +146,10 @@ def draw_bay_group(params):
     current_y = ground_clearance
     pitch_offset_x = dim_offset_x * 2.5
 
+    # Dynamic vertical offset for text to prevent overlap
+    vertical_text_offset = 0
+    text_spacing = max(10.0, total_height / (num_rows * 2))  # Adjust based on total height and rows
+
     for i in range(num_rows):
         shelf_bottom_y = current_y
         ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, shelf_bottom_y), total_group_width, visual_shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
@@ -162,8 +166,14 @@ def draw_bay_group(params):
             draw_dimension_line(ax, core_width + visual_side_panel_thickness + dim_offset_x, bin_bottom_y, core_width + visual_side_panel_thickness + dim_offset_x, bin_top_y, f"{net_bin_h:.1f}", is_vertical=True, offset=5, color='#3b82f6', fontsize=12)
             draw_dimension_line(ax, core_width + visual_side_panel_thickness + pitch_offset_x, shelf_bottom_y, core_width + visual_side_panel_thickness + pitch_offset_x, pitch_top_y, f"{pitch_h:.1f}", is_vertical=True, offset=5, color='black', fontsize=12)
 
-            ax.text(-visual_side_panel_thickness - dim_offset_x, (bin_bottom_y + bin_top_y) / 2, level_name, va='center', ha='center', fontsize=12, fontweight='bold')
-            
+            # Adjust text position with dynamic offset to prevent overlap
+            text_x = -visual_side_panel_thickness - dim_offset_x * 1.5  # Increased horizontal spacing
+            text_y = (bin_bottom_y + bin_top_y) / 2 + vertical_text_offset
+            ax.text(text_x, text_y, level_name, va='center', ha='right', fontsize=12, fontweight='bold', color='black')
+
+            # Increment vertical offset for the next text to avoid overlap
+            vertical_text_offset += text_spacing / (zoom_factor if zoom_factor > 1 else 1)
+
             current_y = bin_top_y
 
     if has_top_cap:
@@ -212,8 +222,8 @@ if 'bay_group' not in st.session_state:
         "ground_clearance": 50.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
-        "num_cols": 3,  # Reduced for better performance
-        "num_rows": 3,  # Reduced for better performance
+        "num_cols": 3,
+        "num_rows": 3,
         "has_top_cap": True,
         "color": "#4A90E2",
         "bin_heights": [350.0] * 3,
