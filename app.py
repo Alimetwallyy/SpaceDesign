@@ -83,25 +83,25 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Helper Functions ---
-def draw_dimension_line(ax, x1, y1, x2, y2, text, is_vertical=False, offset=10, color='black', fontsize=8):
-    """Draws a dimension line with arrows and text."""
+def draw_dimension_line(ax, x1, y1, x2, y2, text, is_vertical=False, offset=15, color='black', fontsize=10):
+    """Draws a dimension line with arrows and bold text."""
     ax.plot([x1, x2], [y1, y2], color=color, lw=0.5, linestyle='--')
     if is_vertical:
         ax.plot([x1, x1], [y1, y1 + 5], color=color, lw=0.5)
         ax.plot([x2, x2], [y2, y2 - 5], color=color, lw=0.5)
-        ax.text(x1 + offset, (y1 + y2) / 2, text, va='center', ha='left', fontsize=fontsize, color=color, fontweight='bold')
+        ax.text(x1 + offset, (y1 + y2) / 2, text, va='center', ha='left', fontsize=fontsize, color=color, fontweight='bold', bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
     else:
         ax.plot([x1, x1 + 5], [y1, y1], color=color, lw=0.5)
         ax.plot([x2, x2 - 5], [y2, y2], color=color, lw=0.5)
-        ax.text((x1 + x2) / 2, y1 + offset, text, va='bottom', ha='center', fontsize=fontsize, color=color, fontweight='bold')
+        ax.text((x1 + x2) / 2, y1 + offset, text, va='bottom', ha='center', fontsize=fontsize, color=color, fontweight='bold', bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
 
 @st.cache_data
 def draw_bay_group(params):
-    """Draws a professional 2D bay design with clear dimensions."""
+    """Draws a professional 2D bay design with clear, non-overlapping dimensions."""
     bay_width = params['bay_width']
     total_height = params['total_height']
     ground_clearance = params['ground_clearance']
-    depth = params['depth']  # Fixed, not shown in bins
+    depth = params['depth']  # Fixed, shown separately
     shelf_thickness = params['shelf_thickness']
     side_thickness = params['side_panel_thickness']
     num_rows = params['num_rows']
@@ -116,7 +116,7 @@ def draw_bay_group(params):
     ax.grid(False)
 
     # Title block
-    ax.text(0.5, 1.02, "Storage Bay Design - Rev 1.0", transform=ax.transAxes, ha='center', va='bottom', fontsize=10, fontweight='bold', color='#424242')
+    ax.text(0.5, 1.02, "Storage Bay Design - Rev 1.0", transform=ax.transAxes, ha='center', va='bottom', fontsize=12, fontweight='bold', color='#424242')
 
     # Draw side panels and shelves
     ax.add_patch(Rectangle((-side_thickness, 0), side_thickness, total_height, facecolor='#e0e0e0', edgecolor=color, lw=1.0))
@@ -136,30 +136,32 @@ def draw_bay_group(params):
         for j in range(num_bins):
             bin_x = j * bin_width
             ax.add_patch(Rectangle((bin_x, bin_y), bin_width, bin_height, facecolor='white', edgecolor=color, lw=0.8))
-            # Display height and width inside bin
+            # Display height and width inside bin (no depth)
             ax.text(bin_x + bin_width / 2, bin_y + bin_height / 2, f"H: {bin_height:.0f}\nW: {bin_width:.0f}",
-                    ha='center', va='center', fontsize=8, color='black', bbox=dict(facecolor='white', alpha=0.9, edgecolor='none'))
+                    ha='center', va='center', fontsize=10, color='black', fontweight='bold', bbox=dict(facecolor='white', alpha=0.9, edgecolor='none'))
 
-        # Shelf height dimension
-        draw_dimension_line(ax, bay_width + side_thickness + 15, bin_y, bay_width + side_thickness + 15, bin_top,
-                          f"{bin_height:.0f} mm", True, 5, '#1976d2')
+        # Shelf height dimension (outside right)
+        draw_dimension_line(ax, bay_width + side_thickness + 20, bin_y, bay_width + side_thickness + 20, bin_top,
+                          f"{bin_height} mm", True, 10, '#1976d2')
 
         current_y = bin_top
 
     if has_top_cap:
         ax.add_patch(Rectangle((0, total_height - shelf_thickness), bay_width, shelf_thickness, facecolor='#d0d0d0', edgecolor=color, lw=1.0))
 
-    # Overall dimensions
-    draw_dimension_line(ax, -side_thickness - 15, 0, bay_width + side_thickness + 15, 0, f"Width: {bay_width + 2 * side_thickness:.0f} mm", False, 5, 'black')
-    draw_dimension_line(ax, -side_thickness - 25, 0, -side_thickness - 25, total_height, f"Height: {total_height:.0f} mm", True, 5, 'black')
+    # Overall dimensions (outside edges)
+    draw_dimension_line(ax, -side_thickness - 25, 0, bay_width + side_thickness + 25, 0, f"Total Width: {bay_width + 2 * side_thickness:.0f} mm", False, 10, 'black')
+    draw_dimension_line(ax, -side_thickness - 35, 0, -side_thickness - 35, total_height, f"Total Height: {total_height:.0f} mm", True, 10, 'black')
+    # Ground clearance dimension (below design)
+    draw_dimension_line(ax, 0, 0, 0, ground_clearance, f"Ground Clearance: {ground_clearance:.0f} mm", True, 10, '#388e3c')
 
-    # Scale indicator
+    # Scale indicator (bottom right, clarified)
     scale_length = 500  # 500 mm scale
-    ax.plot([0, scale_length / 10], [-10, -10], color='black', lw=1.0)
-    ax.text(scale_length / 20, -15, "500 mm", ha='center', va='top', fontsize=8, color='black')
+    ax.plot([bay_width - scale_length / 10, bay_width], [-20, -20], color='black', lw=1.0)
+    ax.text(bay_width - scale_length / 20, -25, "Scale: 500 mm", ha='center', va='top', fontsize=10, color='black', fontweight='bold')
 
-    ax.set_xlim(-side_thickness * 2 - 30, bay_width + side_thickness * 2 + 30)
-    ax.set_ylim(-20, total_height + 20)
+    ax.set_xlim(-side_thickness * 2 - 40, bay_width + side_thickness * 2 + 40)
+    ax.set_ylim(-30, total_height + 30)
     ax.axis('off')
     return fig
 
