@@ -13,11 +13,10 @@ logger.info("Starting Storage Bay Designer app")
 # --- Page Configuration (Must be the first Streamlit command) ---
 st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
 
-# --- Custom CSS for Improved Styling ---
+# --- Custom CSS for Improved Styling (Theme-Aware) ---
 st.markdown("""
 <style>
     .stApp {
-        background-color: #f5f5f5;
         font-family: 'Arial', sans-serif;
     }
     .stButton>button {
@@ -30,26 +29,36 @@ st.markdown("""
         background-color: #357ABD;
     }
     .stSidebar .stNumberInput input, .stSidebar .stTextInput input {
-        border: 1px solid #ccc;
+        border: 1px solid var(--text-color, #ccc);
         border-radius: 4px;
     }
     .stError, .error-container {
-        background-color: #ffe6e6;
+        background-color: var(--background-color, #ffe6e6);
         border-left: 4px solid #ff4d4d;
         padding: 10px;
         border-radius: 4px;
-        color: #d8000c;
+        color: var(--text-color, #d8000c);
     }
-    h1, h2, h3 {
-        color: #333;
-    }
-    .stSidebar .stMarkdown {
-        color: #333;
+    h1, h2, h3, .stSidebar .stMarkdown {
+        color: var(--text-color, #333);
     }
     .stMetric {
-        background-color: #e6f3ff;
+        background-color: var(--background-color, #e6f3ff);
         padding: 10px;
         border-radius: 4px;
+        color: var(--text-color, #333);
+    }
+    /* Ensure text visibility in dark mode */
+    [data-theme="dark"] .stSidebar .stMarkdown,
+    [data-theme="dark"] h1,
+    [data-theme="dark"] h2,
+    [data-theme="dark"] h3,
+    [data-theme="dark"] .stMetric {
+        color: #ffffff !important;
+    }
+    [data-theme="dark"] .stError, [data-theme="dark"] .error-container {
+        background-color: #4a0000;
+        color: #ff9999;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -119,8 +128,8 @@ def draw_bay_group(params):
     dim_offset_x = 0.05 * core_width
     dim_offset_y = 0.05 * total_height
     
-    fig, ax = plt.subplots(figsize=(8, 6))  # Reduced for mobile compatibility
-    ax.grid(True, linestyle='--', alpha=0.2)  # Subtle grid for better visuals
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.grid(True, linestyle='--', alpha=0.2)
 
     ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
     ax.add_patch(patches.Rectangle((core_width, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
@@ -160,9 +169,7 @@ def draw_bay_group(params):
     if has_top_cap:
         ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, total_height - visual_shelf_thickness), total_group_width, visual_shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
 
-    # Add Ground Clearance dimension
     draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), ground_clearance, f"Ground Clearance: {ground_clearance:.0f} mm", is_vertical=True, offset=10, fontsize=12)
-
     draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 2, core_width + visual_side_panel_thickness, -dim_offset_y * 2, f"Total Group Width: {total_group_width:.0f} mm", offset=10, fontsize=12)
     draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10, fontsize=12)
 
@@ -205,12 +212,12 @@ if 'bay_group' not in st.session_state:
         "ground_clearance": 50.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
-        "num_cols": 4,
-        "num_rows": 5,
+        "num_cols": 3,  # Reduced for better performance
+        "num_rows": 3,  # Reduced for better performance
         "has_top_cap": True,
         "color": "#4A90E2",
-        "bin_heights": [350.0] * 5,
-        "lock_heights": [False] * 5,
+        "bin_heights": [350.0] * 3,
+        "lock_heights": [False] * 3,
         "zoom": 1.5
     }
 
@@ -256,26 +263,44 @@ if st.sidebar.button("Reset to Defaults", help="Reset all settings to default va
         "ground_clearance": 50.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
-        "num_cols": 4,
-        "num_rows": 5,
+        "num_cols": 3,
+        "num_rows": 3,
         "has_top_cap": True,
         "color": "#4A90E2",
-        "bin_heights": [350.0] * 5,
-        "lock_heights": [False] * 5,
+        "bin_heights": [350.0] * 3,
+        "lock_heights": [False] * 3,
         "zoom": 1.5
     }
-    st.experimental_rerun()
+    st.rerun()
 
 # Quick Presets
 st.sidebar.header("Quick Presets", divider="gray")
 col1, col2, col3 = st.sidebar.columns(3)
 with col1:
-    if st.button("Small Bay"):
+    if st.button("Small Bay", help="Apply settings for a small storage bay."):
         group_data.update({
             "bay_width": 600.0,
             "total_height": 1200.0,
-            "num_rows": 3,
+            "num_rows": 2,
             "num_cols": 2,
+            "bin_heights": [350.0] * 2,
+            "lock_heights": [False] * 2,
+            "ground_clearance": 50.0,
+            "shelf_thickness": 18.0,
+            "side_panel_thickness": 18.0,
+            "has_top_cap": True,
+            "color": "#4A90E2",
+            "zoom": 1.5
+        })
+        update_total_height()
+        st.rerun()
+with col2:
+    if st.button("Medium Bay", help="Apply settings for a medium storage bay."):
+        group_data.update({
+            "bay_width": 1050.0,
+            "total_height": 2000.0,
+            "num_rows": 3,
+            "num_cols": 3,
             "bin_heights": [350.0] * 3,
             "lock_heights": [False] * 3,
             "ground_clearance": 50.0,
@@ -286,34 +311,16 @@ with col1:
             "zoom": 1.5
         })
         update_total_height()
-        st.experimental_rerun()
-with col2:
-    if st.button("Medium Bay"):
-        group_data.update({
-            "bay_width": 1050.0,
-            "total_height": 2000.0,
-            "num_rows": 5,
-            "num_cols": 4,
-            "bin_heights": [350.0] * 5,
-            "lock_heights": [False] * 5,
-            "ground_clearance": 50.0,
-            "shelf_thickness": 18.0,
-            "side_panel_thickness": 18.0,
-            "has_top_cap": True,
-            "color": "#4A90E2",
-            "zoom": 1.5
-        })
-        update_total_height()
-        st.experimental_rerun()
+        st.rerun()
 with col3:
-    if st.button("Large Bay"):
+    if st.button("Large Bay", help="Apply settings for a large storage bay."):
         group_data.update({
             "bay_width": 1500.0,
             "total_height": 3000.0,
-            "num_rows": 7,
-            "num_cols": 6,
-            "bin_heights": [400.0] * 7,
-            "lock_heights": [False] * 7,
+            "num_rows": 4,
+            "num_cols": 4,
+            "bin_heights": [400.0] * 4,
+            "lock_heights": [False] * 4,
             "ground_clearance": 50.0,
             "shelf_thickness": 18.0,
             "side_panel_thickness": 18.0,
@@ -322,7 +329,7 @@ with col3:
             "zoom": 1.5
         })
         update_total_height()
-        st.experimental_rerun()
+        st.rerun()
 
 # Error Display
 errors = validate_group_params(group_data)
@@ -340,13 +347,12 @@ with st.sidebar.expander("Bay Configuration", expanded=False):
     group_data['shelf_thickness'] = st.number_input("Shelf Thickness (mm)", min_value=1.0, value=float(group_data['shelf_thickness']), key=f"shelf_thick_{group_data['id']}", on_change=update_total_height, help="Thickness of each shelf.")
     group_data['side_panel_thickness'] = st.number_input("Side Panel Thickness (mm)", min_value=1.0, value=float(group_data['side_panel_thickness']), key=f"side_panel_thick_{group_data['id']}", help="Thickness of the outer side panels.")
     group_data['color'] = st.color_picker("Structure Color", value=group_data['color'], key=f"color_{group_data['id']}", help="Color of the bay structure in the preview.")
-    group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust the zoom level for the preview and SVG output.")
 
 with st.sidebar.expander("Layout", expanded=False):
     st.markdown("**Configure the bay layout.**")
     prev_num_rows = group_data['num_rows']
-    group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows) in the bay.")
-    group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns in the bay.")
+    group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, max_value=10, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows) in the bay (max 10).")
+    group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, max_value=10, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns in the bay (max 10).")
 
     if prev_num_rows != group_data['num_rows']:
         if group_data['num_rows'] > len(group_data['bin_heights']):
@@ -364,16 +370,23 @@ with st.sidebar.expander("Bin Height Settings", expanded=False):
     if not auto_distribute:
         heights_input = st.text_input("Bin Heights (mm, comma-separated)", value=",".join(str(h) for h in group_data['bin_heights']), key=f"heights_{group_data['id']}", help="Enter heights for each level, e.g., 350,350,350")
         try:
-            group_data['bin_heights'] = [float(h) for h in heights_input.split(",") if h.strip()]
-            if len(group_data['bin_heights']) != group_data['num_rows']:
-                st.error(f"Number of heights ({len(group_data['bin_heights'])}) must match number of rows ({group_data['num_rows']}).")
+            new_heights = [float(h) for h in heights_input.split(",") if h.strip()]
+            if len(new_heights) != group_data['num_rows']:
+                st.error(f"Number of heights ({len(new_heights)}) must match number of rows ({group_data['num_rows']}).")
+            elif any(h <= 0 for h in new_heights):
+                st.error("All bin heights must be positive numbers.")
             else:
-                group_data['lock_heights'] = [False] * len(group_data['bin_heights'])
+                group_data['bin_heights'] = new_heights
+                group_data['lock_heights'] = [False] * len(new_heights)
                 update_total_height()
         except ValueError:
             st.error("Invalid height format. Use comma-separated numbers (e.g., 350,350,350).")
     else:
         distribute_total_height()
+
+with st.sidebar.expander("Advanced Settings", expanded=False):
+    st.markdown("**Adjust advanced visual settings.**")
+    group_data['zoom'] = st.slider("Zoom Level", 1.0, 5.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}", help="Adjust the zoom level for the preview and SVG output.")
 
 # Calculated Height Metric
 total_net_bin_h = sum(group_data['bin_heights'])
@@ -391,7 +404,7 @@ with col1:
 
 with col2:
     st.header(f"Design Preview: {group_data['name']}")
-    show_preview = st.checkbox("Show Live Preview", value=True, help="Toggle real-time design preview to improve performance.")
+    show_preview = st.checkbox("Show Live Preview", value=False, help="Toggle real-time design preview to improve performance.")
     if show_preview and not errors:
         with st.spinner("Rendering preview..."):
             fig = draw_bay_group(group_data)
