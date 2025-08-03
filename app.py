@@ -172,11 +172,14 @@ def create_editable_export(bay_group, format_type):
     return export_buf, filename, mime_type
 
 def update_bin_counts():
-    if len(group_data['bin_counts_per_row']) != group_data['num_rows']:
-        if group_data['num_rows'] > len(group_data['bin_counts_per_row']):
-            group_data['bin_counts_per_row'].extend([3] * (group_data['num_rows'] - len(group_data['bin_counts_per_row'])))
-        else:
-            group_data['bin_counts_per_row'] = group_data['bin_counts_per_row'][:group_data['num_rows']]
+    current_rows = len(group_data['bin_counts_per_row'])
+    new_rows = group_data['num_rows']
+    if new_rows > current_rows:
+        group_data['bin_counts_per_row'].extend([3] * (new_rows - current_rows))
+        group_data['bin_heights'].extend([650.0] * (new_rows - current_rows))
+    elif new_rows < current_rows:
+        group_data['bin_counts_per_row'] = group_data['bin_counts_per_row'][:new_rows]
+        group_data['bin_heights'] = group_data['bin_heights'][:new_rows]
 
 def update_total_height():
     total_shelf_h = (group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)) * group_data['shelf_thickness']
