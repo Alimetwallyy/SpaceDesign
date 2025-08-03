@@ -96,9 +96,9 @@ def validate_group_params(params):
         errors.append("Side panel thickness must be positive.")
     if params['num_rows'] < 1:
         errors.append("Number of rows must be at least 1.")
-    if len(params['bin_counts_per_row']) != params['num_rows']:
+    if 'bin_counts_per_row' not in params or len(params['bin_counts_per_row']) != params['num_rows']:
         errors.append("Number of bin counts must match the number of rows.")
-    for count in params['bin_counts_per_row']:
+    for count in params.get('bin_counts_per_row', []):
         if count < 1:
             errors.append("Each shelf must have at least 1 bin.")
     total_net_bin_h = sum(params['bin_heights'])
@@ -250,9 +250,10 @@ if 'bay_group' not in st.session_state:
         "color": "#4A90E2",
         "bin_heights": [350.0] * 3,
         "lock_heights": [False] * 3,
-        "bin_counts_per_row": [3] * 3,  # Initial bin counts per row
+        "bin_counts_per_row": [3] * 3,
         "zoom": 1.5
     }
+update_bin_counts()  # Ensure bin_counts_per_row is synced on startup
 
 group_data = st.session_state.bay_group
 
@@ -311,6 +312,7 @@ if st.sidebar.button("Reset to Defaults", help="Reset all settings to default va
         "bin_counts_per_row": [3] * 3,
         "zoom": 1.5
     }
+    update_bin_counts()  # Sync bin_counts_per_row after reset
     st.rerun()
 
 # Quick Presets
@@ -333,6 +335,7 @@ with col1:
             "zoom": 1.5
         })
         update_total_height()
+        update_bin_counts()
         st.rerun()
 with col2:
     if st.button("Medium Bay", help="Apply settings for a medium storage bay."):
@@ -351,6 +354,7 @@ with col2:
             "zoom": 1.5
         })
         update_total_height()
+        update_bin_counts()
         st.rerun()
 with col3:
     if st.button("Large Bay", help="Apply settings for a large storage bay."):
@@ -369,6 +373,7 @@ with col3:
             "zoom": 1.5
         })
         update_total_height()
+        update_bin_counts()
         st.rerun()
 
 # Error Display
