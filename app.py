@@ -113,29 +113,28 @@ def draw_bay_group(params):
     ax.add_patch(Rectangle((bay_width, 0), side_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
 
     current_y = ground_clearance
-    for i in range(num_rows):
+    for i in range(min(num_rows, len(bin_heights))):  # Limit to available heights
         shelf_y = current_y
         ax.add_patch(Rectangle((0, shelf_y), bay_width, shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
-        if i < len(bin_heights):
-            bin_height = bin_heights[i]
-            bin_y = shelf_y + shelf_thickness
-            bin_top = bin_y + bin_height
-            num_bins = bin_counts[i]
-            bin_width = bay_width / num_bins
+        bin_height = bin_heights[i]
+        bin_y = shelf_y + shelf_thickness
+        bin_top = bin_y + bin_height
+        num_bins = bin_counts[i]
+        bin_width = bay_width / num_bins
 
-            # Draw bins
-            for j in range(num_bins):
-                bin_x = j * bin_width
-                ax.add_patch(Rectangle((bin_x, bin_y), bin_width, bin_height, facecolor='#e0e0e0', edgecolor=color, lw=1, alpha=0.5))
-                # Dimension inside bin
-                ax.text(bin_x + bin_width / 2, bin_y + bin_height / 2, f"{bin_width:.0f}x{depth:.0f}",
-                        ha='center', va='center', fontsize=8, color='black', bbox=dict(facecolor='white', alpha=0.7))
+        # Draw bins
+        for j in range(num_bins):
+            bin_x = j * bin_width
+            ax.add_patch(Rectangle((bin_x, bin_y), bin_width, bin_height, facecolor='#e0e0e0', edgecolor=color, lw=1, alpha=0.5))
+            # Dimension inside bin
+            ax.text(bin_x + bin_width / 2, bin_y + bin_height / 2, f"{bin_width:.0f}x{depth:.0f}",
+                    ha='center', va='center', fontsize=8, color='black', bbox=dict(facecolor='white', alpha=0.7))
 
-            # Shelf height dimension
-            draw_dimension_line(ax, bay_width + side_thickness + 10, bin_y, bay_width + side_thickness + 10, bin_top,
-                              f"{bin_height:.0f}", True, 5, '#2196F3')
+        # Shelf height dimension
+        draw_dimension_line(ax, bay_width + side_thickness + 10, bin_y, bay_width + side_thickness + 10, bin_top,
+                          f"{bin_height:.0f}", True, 5, '#2196F3')
 
-            current_y = bin_top
+        current_y = bin_top
 
     if has_top_cap:
         ax.add_patch(Rectangle((0, total_height - shelf_thickness), bay_width, shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
@@ -180,6 +179,8 @@ def update_bin_counts():
     elif new_rows < current_rows:
         group_data['bin_counts_per_row'] = group_data['bin_counts_per_row'][:new_rows]
         group_data['bin_heights'] = group_data['bin_heights'][:new_rows]
+    # Ensure UI loop won't exceed list length
+    group_data['num_rows'] = min(new_rows, len(group_data['bin_heights']))
 
 def update_total_height():
     total_shelf_h = (group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)) * group_data['shelf_thickness']
@@ -191,7 +192,7 @@ if 'bay_group' not in st.session_state:
         "id": str(uuid.uuid4()),
         "name": "Bay Design",
         "bay_width": 1050.0,
-        "total_height": 2000.0,
+        "total_height": 2000.0,  # Will be recalculated
         "ground_clearance": 50.0,
         "depth": 600.0,
         "shelf_thickness": 18.0,
@@ -241,7 +242,7 @@ with st.sidebar:
             "id": str(uuid.uuid4()),
             "name": "Bay Design",
             "bay_width": 1050.0,
-            "total_height": 2000.0,
+            "total_height": 2000.0,  # Will be recalculated
             "ground_clearance": 50.0,
             "depth": 600.0,
             "shelf_thickness": 18.0,
