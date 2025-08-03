@@ -94,10 +94,13 @@ def validate_group_params(params):
         errors.append("Shelf thickness must be positive.")
     if params['side_panel_thickness'] <= 0:
         errors.append("Side panel thickness must be positive.")
-    if params['num_cols'] < 1:
-        errors.append("Number of columns must be at least 1.")
     if params['num_rows'] < 1:
         errors.append("Number of rows must be at least 1.")
+    if len(params['bin_counts_per_row']) != params['num_rows']:
+        errors.append("Number of bin counts must match the number of rows.")
+    for count in params['bin_counts_per_row']:
+        if count < 1:
+            errors.append("Each shelf must have at least 1 bin.")
     total_net_bin_h = sum(params['bin_heights'])
     num_shelves = params['num_rows'] + (1 if params['has_top_cap'] else 0)
     required_height = total_net_bin_h + num_shelves * params['shelf_thickness'] + params['ground_clearance']
@@ -113,11 +116,11 @@ def draw_bay_group(params):
     ground_clearance = params['ground_clearance']
     shelf_thickness = params['shelf_thickness']
     side_panel_thickness = params['side_panel_thickness']
-    num_cols = params['num_cols']
     num_rows = params['num_rows']
     has_top_cap = params['has_top_cap']
     color = params['color']
     bin_heights = params['bin_heights']
+    bin_counts_per_row = params['bin_counts_per_row']
     zoom_factor = params.get('zoom', 1.0)
 
     visual_shelf_thickness = min(shelf_thickness, 18.0)
@@ -133,15 +136,6 @@ def draw_bay_group(params):
 
     ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
     ax.add_patch(patches.Rectangle((core_width, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
-
-    net_width_per_bay = bay_width - 2 * side_panel_thickness
-    bin_width = net_width_per_bay / num_cols if num_cols > 0 else 0
-
-    bin_start_x = 0
-    if num_cols > 1:
-        for i in range(1, num_cols):
-            split_x = bin_start_x + (i * bin_width)
-            ax.add_patch(patches.Rectangle((split_x, ground_clearance), 0, total_height - ground_clearance, facecolor='none', edgecolor=color, lw=1.5))
 
     current_y = ground_clearance
     pitch_offset_x = dim_offset_x * 2.5
@@ -174,6 +168,16 @@ def draw_bay_group(params):
             # Increment vertical offset for the next text to avoid overlap
             vertical_text_offset += text_spacing / (zoom_factor if zoom_factor > 1 else 1)
 
+            # Draw bin divisions for the current row
+            num_bins = bin_counts_per_row[i]
+            if num_bins > 1:
+                net_width_per_bay = bay_width - 2 * side_panel_thickness
+                bin_width = net_width_per_bay / num_bins
+                bin_start_x = 0
+                for j in range(1, num_bins):
+                    split_x = bin_start_x + (j * bin_width)
+                    ax.add_patch(patches.Rectangle((split_x, bin_bottom_y), 0, net_bin_h, facecolor='none', edgecolor=color, lw=1.5))
+
             current_y = bin_top_y
 
     if has_top_cap:
@@ -185,13 +189,18 @@ def draw_bay_group(params):
     draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 4, core_width + visual_side_panel_thickness, -dim_offset_y * 4, f"Total Group Width: {total_group_width:.0f} mm", offset=10, color='black', fontsize=12)
     draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10, color='black', fontsize=12)
 
-    if num_cols > 0:
+    if max(bin_counts_per_row) > 0:
         dim_y_pos = total_height + dim_offset_y
-        bin_start_x = 0
-        for i in range(num_cols):
-            dim_start_x = bin_start_x + (i * bin_width)
-            dim_end_x = dim_start_x + bin_width
-            draw_dimension_line(ax, dim_start_x, dim_y_pos, dim_end_x, dim_y_pos, f"{bin_width:.1f}", offset=10, color='#3b82f6', fontsize=12)
+        for i in range(num_rows):
+            num_bins = bin_counts_per_row[i]
+            if num_bins > 0:
+                net_width_per_bay = bay_width - 2 * side_panel_thickness
+                bin_width = net_width_per_bay / num_bins
+                bin_start_x = 0
+                for j in range(num_bins):
+                    dim_start_x = bin_start_x + (j * bin_width)
+                    dim_end_x = dim_start_x + bin_width
+                    draw_dimension_line(ax, dim_start_x, dim_y_pos, dim_end_x, dim_y_pos, f"{bin_width:.1f}", offset=10, color='#3b82f6', fontsize=12)
 
     ax.set_aspect('equal', adjustable='box')
     padding_x = core_width * 0.4 + visual_side_panel_thickness
@@ -236,12 +245,12 @@ if 'bay_group' not in st.session_state:
         "ground_clearance": 50.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
-        "num_cols": 3,
         "num_rows": 3,
         "has_top_cap": True,
         "color": "#4A90E2",
         "bin_heights": [350.0] * 3,
         "lock_heights": [False] * 3,
+        "bin_counts_per_row": [3] * 3,  # Initial bin counts per row
         "zoom": 1.5
     }
 
@@ -263,6 +272,13 @@ def update_total_height():
     total_shelf_h = num_shelves_for_calc * group_data['shelf_thickness']
     total_net_bin_h = sum(group_data['bin_heights'])
     group_data['total_height'] = total_net_bin_h + total_shelf_h + group_data['ground_clearance']
+
+def update_bin_counts():
+    if len(group_data['bin_counts_per_row']) != group_data['num_rows']:
+        if group_data['num_rows'] > len(group_data['bin_counts_per_row']):
+            group_data['bin_counts_per_row'].extend([3] * (group_data['num_rows'] - len(group_data['bin_counts_per_row'])))
+        else:
+            group_data['bin_counts_per_row'] = group_data['bin_counts_per_row'][:group_data['num_rows']]
 
 # --- UI and Logic ---
 st.title("Storage Bay Designer")
@@ -287,12 +303,12 @@ if st.sidebar.button("Reset to Defaults", help="Reset all settings to default va
         "ground_clearance": 50.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
-        "num_cols": 3,
         "num_rows": 3,
         "has_top_cap": True,
         "color": "#4A90E2",
         "bin_heights": [350.0] * 3,
         "lock_heights": [False] * 3,
+        "bin_counts_per_row": [3] * 3,
         "zoom": 1.5
     }
     st.rerun()
@@ -306,14 +322,14 @@ with col1:
             "bay_width": 600.0,
             "total_height": 1200.0,
             "num_rows": 2,
-            "num_cols": 2,
+            "has_top_cap": True,
+            "color": "#4A90E2",
             "bin_heights": [350.0] * 2,
             "lock_heights": [False] * 2,
+            "bin_counts_per_row": [2] * 2,
             "ground_clearance": 50.0,
             "shelf_thickness": 18.0,
             "side_panel_thickness": 18.0,
-            "has_top_cap": True,
-            "color": "#4A90E2",
             "zoom": 1.5
         })
         update_total_height()
@@ -324,14 +340,14 @@ with col2:
             "bay_width": 1050.0,
             "total_height": 2000.0,
             "num_rows": 3,
-            "num_cols": 3,
+            "has_top_cap": True,
+            "color": "#4A90E2",
             "bin_heights": [350.0] * 3,
             "lock_heights": [False] * 3,
+            "bin_counts_per_row": [3] * 3,
             "ground_clearance": 50.0,
             "shelf_thickness": 18.0,
             "side_panel_thickness": 18.0,
-            "has_top_cap": True,
-            "color": "#4A90E2",
             "zoom": 1.5
         })
         update_total_height()
@@ -342,14 +358,14 @@ with col3:
             "bay_width": 1500.0,
             "total_height": 3000.0,
             "num_rows": 4,
-            "num_cols": 4,
+            "has_top_cap": True,
+            "color": "#4A90E2",
             "bin_heights": [400.0] * 4,
             "lock_heights": [False] * 4,
+            "bin_counts_per_row": [4] * 4,
             "ground_clearance": 50.0,
             "shelf_thickness": 18.0,
             "side_panel_thickness": 18.0,
-            "has_top_cap": True,
-            "color": "#4A90E2",
             "zoom": 1.5
         })
         update_total_height()
@@ -376,17 +392,13 @@ with st.sidebar.expander("Layout", expanded=False):
     st.markdown("**Configure the bay layout.**")
     prev_num_rows = group_data['num_rows']
     group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, max_value=10, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows) in the bay (max 10).")
-    group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, max_value=10, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns in the bay (max 10).")
+    update_bin_counts()
 
-    if prev_num_rows != group_data['num_rows']:
-        if group_data['num_rows'] > len(group_data['bin_heights']):
-            default_height = group_data['bin_heights'][0] if group_data['bin_heights'] else 350.0
-            group_data['bin_heights'].extend([default_height] * (group_data['num_rows'] - len(group_data['bin_heights'])))
-            group_data['lock_heights'].extend([False] * (group_data['num_rows'] - len(group_data['lock_heights'])))
-        else:
-            group_data['bin_heights'] = group_data['bin_heights'][:group_data['num_rows']]
-            group_data['lock_heights'] = group_data['lock_heights'][:group_data['num_rows']]
-        update_total_height()
+with st.sidebar.expander("Bin Count Settings", expanded=False):
+    st.markdown("**Set the number of bins per shelf.**")
+    for i in range(group_data['num_rows']):
+        label = f"Shelf {chr(65 + i)} Bin Count"
+        group_data['bin_counts_per_row'][i] = st.number_input(label, min_value=1, max_value=10, value=group_data['bin_counts_per_row'][i], key=f"bin_count_{i}_{group_data['id']}", help=f"Number of bins for shelf {chr(65 + i)} (max 10).")
 
 with st.sidebar.expander("Bin Height Settings", expanded=False):
     st.markdown("**Configure bin heights.**")
@@ -436,7 +448,7 @@ with col2:
     elif errors:
         st.error("Please resolve configuration errors to view the design.")
 
-# SVG Download
+# Export Download
 st.sidebar.header("Export Design", divider="gray")
 export_format = st.selectbox("Export Format", ["svg", "png", "pdf"], index=0, help="Choose the file format for export.")
 if st.sidebar.button("Download File", type="primary", help="Download the bay design in the selected format."):
