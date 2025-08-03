@@ -6,8 +6,9 @@ import uuid
 import logging
 
 # --- Configure Logging (suppressed in production) ---
-logging.basicConfig(level=logging.CRITICAL)
+logging.basicConfig(level=logging.INFO)  # Changed to INFO for debugging
 logger = logging.getLogger(__name__)
+logger.info("Starting Storage Bay Designer app")  # Added startup log
 
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
