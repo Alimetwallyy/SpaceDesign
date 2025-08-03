@@ -6,9 +6,9 @@ import uuid
 import logging
 
 # --- Configure Logging (suppressed in production) ---
-logging.basicConfig(level=logging.INFO)  # Changed to INFO for debugging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info("Starting Storage Bay Designer app")  # Added startup log
+logger.info("Starting Storage Bay Designer app")
 
 # --- Page Configuration ---
 st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
@@ -34,8 +34,6 @@ def draw_dimension_line(ax, x1, y1, x2, y2, text, is_vertical=False, offset=10, 
 def validate_group_params(params):
     """Validates bay group parameters and returns errors if any."""
     errors = []
-    if params['num_bays'] < 1:
-        errors.append("Number of bays must be at least 1.")
     if params['bay_width'] <= 0:
         errors.append("Bay width must be positive.")
     if params['total_height'] <= 0:
@@ -59,8 +57,7 @@ def validate_group_params(params):
 
 @st.cache_data
 def draw_bay_group(params):
-    """Draws a group of bays using Matplotlib for the LIVE PREVIEW."""
-    num_bays = params['num_bays']
+    """Draws a single bay using Matplotlib for the LIVE PREVIEW."""
     bay_width = params['bay_width']
     total_height = params['total_height']
     ground_clearance = params['ground_clearance']
@@ -76,7 +73,7 @@ def draw_bay_group(params):
     visual_shelf_thickness = min(shelf_thickness, 18.0)
     visual_side_panel_thickness = max(side_panel_thickness, 10.0)
 
-    core_width = num_bays * bay_width
+    core_width = bay_width
     total_group_width = core_width + (2 * side_panel_thickness)
     dim_offset_x = 0.05 * core_width
     dim_offset_y = 0.05 * total_height
@@ -86,22 +83,14 @@ def draw_bay_group(params):
     ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
     ax.add_patch(patches.Rectangle((core_width, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
 
-    current_x = 0
-    for bay_idx in range(num_bays):
-        net_width_per_bay = bay_width - 2 * side_panel_thickness
-        bin_width = net_width_per_bay / num_cols if num_cols > 0 else 0
+    net_width_per_bay = bay_width - 2 * side_panel_thickness
+    bin_width = net_width_per_bay / num_cols if num_cols > 0 else 0
 
-        bin_start_x = current_x
-        if num_cols > 1:
-            for i in range(1, num_cols):
-                split_x = bin_start_x + (i * bin_width)
-                ax.add_patch(patches.Rectangle((split_x, ground_clearance), 0, total_height - ground_clearance, facecolor='none', edgecolor=color, lw=1.5))
-        
-        if bay_idx < num_bays - 1:
-            divider_x = current_x + bay_width
-            ax.plot([divider_x, divider_x], [ground_clearance, total_height - ground_clearance], color='#aaaaaa', lw=1, linestyle='--')
-
-        current_x += bay_width
+    bin_start_x = 0
+    if num_cols > 1:
+        for i in range(1, num_cols):
+            split_x = bin_start_x + (i * bin_width)
+            ax.add_patch(patches.Rectangle((split_x, ground_clearance), 0, total_height - ground_clearance, facecolor='none', edgecolor=color, lw=1.5))
 
     current_y = ground_clearance
     pitch_offset_x = dim_offset_x * 2.5
@@ -137,18 +126,11 @@ def draw_bay_group(params):
 
     if num_cols > 0:
         dim_y_pos = total_height + dim_offset_y
-        loop_current_x = 0
-        for bay_idx in range(num_bays):
-            net_width_per_bay = bay_width - 2 * side_panel_thickness
-            bin_width = net_width_per_bay / num_cols if num_cols > 0 else 0
-            
-            bin_start_x = loop_current_x
-            for i in range(num_cols):
-                dim_start_x = bin_start_x + (i * bin_width)
-                dim_end_x = dim_start_x + bin_width
-                draw_dimension_line(ax, dim_start_x, dim_y_pos, dim_end_x, dim_y_pos, f"{bin_width:.1f}", offset=10, color='#3b82f6')
-            
-            loop_current_x += bay_width
+        bin_start_x = 0
+        for i in range(num_cols):
+            dim_start_x = bin_start_x + (i * bin_width)
+            dim_end_x = dim_start_x + bin_width
+            draw_dimension_line(ax, dim_start_x, dim_y_pos, dim_end_x, dim_y_pos, f"{bin_width:.1f}", offset=10, color='#3b82f6')
 
     ax.set_aspect('equal', adjustable='box')
     padding_x = core_width * 0.4 + visual_side_panel_thickness
@@ -175,7 +157,7 @@ if 'bay_group' not in st.session_state:
     st.session_state.bay_group = {
         "id": str(uuid.uuid4()),
         "name": "Bay Design",
-        "num_bays": 2,
+        "num_bays": 1,  # Fixed to 1
         "bay_width": 1050.0,
         "total_height": 2000.0,
         "ground_clearance": 50.0,
@@ -211,16 +193,15 @@ def update_total_height():
 
 # --- UI and Logic ---
 st.title("Storage Bay Designer")
-st.markdown("Design and visualize a storage bay configuration with real-time previews and generate an editable SVG output.")
+st.markdown("Design and visualize a single storage bay with real-time previews and generate an editable SVG output.")
 
 st.sidebar.header("Configure Bay Design", divider="gray")
-st.sidebar.markdown("Customize the single bay design below.")
+st.sidebar.markdown("Customize your storage bay below.")
 
 with st.sidebar.expander("Structure", expanded=True):
-    st.markdown("**Configure the bay group structure.**")
-    group_data['num_bays'] = st.number_input("Number of Bays", min_value=1, value=int(group_data['num_bays']), key=f"num_bays_{group_data['id']}", help="Number of bays in the group.")
-    group_data['bay_width'] = st.number_input("Width per Bay (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}", help="Width of each bay in millimeters.")
-    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height, help="Total height of the bay group.")
+    st.markdown("**Configure the bay structure.**")
+    group_data['bay_width'] = st.number_input("Bay Width (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}", help="Width of the bay in millimeters.")
+    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height, help="Total height of the bay.")
     group_data['ground_clearance'] = st.number_input("Ground Clearance (mm)", min_value=0.0, value=float(group_data['ground_clearance']), key=f"ground_clearance_{group_data['id']}", on_change=update_total_height, help="Height from ground to first shelf.")
     group_data['has_top_cap'] = st.checkbox("Include Top Cap", value=group_data['has_top_cap'], key=f"has_top_cap_{group_data['id']}", on_change=update_total_height, help="Add a top cap shelf.")
 
@@ -228,7 +209,7 @@ with st.sidebar.expander("Layout", expanded=True):
     st.markdown("**Configure the bay layout.**")
     prev_num_rows = group_data['num_rows']
     group_data['num_rows'] = st.number_input("Shelves (Rows)", min_value=1, value=int(group_data['num_rows']), key=f"num_rows_{group_data['id']}", on_change=update_total_height, help="Number of shelves (rows).")
-    group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns per bay.")
+    group_data['num_cols'] = st.number_input("Bin Columns", min_value=1, value=int(group_data['num_cols']), key=f"num_cols_{group_data['id']}", help="Number of bin columns in the bay.")
 
     if prev_num_rows != group_data['num_rows']:
         if group_data['num_rows'] > len(group_data['bin_heights']):
