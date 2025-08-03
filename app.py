@@ -10,6 +10,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.info("Starting Storage Bay Designer app")
 
+# --- Page Configuration (Must be the first Streamlit command) ---
+st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
+
 # --- Custom CSS for Improved Styling ---
 st.markdown("""
 <style>
@@ -50,9 +53,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# --- Page Configuration ---
-st.set_page_config(layout="wide", page_title="Storage Bay Designer", page_icon="📐")
 
 # --- Helper Functions ---
 def hex_to_rgb(hex_color):
