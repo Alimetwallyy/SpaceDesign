@@ -125,7 +125,7 @@ def draw_bay_group(params):
 
     core_width = bay_width
     total_group_width = core_width + (2 * side_panel_thickness)
-    dim_offset_x = 0.1 * core_width  # Increased for better spacing
+    dim_offset_x = 0.1 * core_width
     dim_offset_y = 0.05 * total_height
     
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -148,7 +148,7 @@ def draw_bay_group(params):
 
     # Dynamic vertical offset for text to prevent overlap
     vertical_text_offset = 0
-    text_spacing = max(10.0, total_height / (num_rows * 2))  # Adjust based on total height and rows
+    text_spacing = max(10.0, total_height / (num_rows * 2))
 
     for i in range(num_rows):
         shelf_bottom_y = current_y
@@ -167,7 +167,7 @@ def draw_bay_group(params):
             draw_dimension_line(ax, core_width + visual_side_panel_thickness + pitch_offset_x, shelf_bottom_y, core_width + visual_side_panel_thickness + pitch_offset_x, pitch_top_y, f"{pitch_h:.1f}", is_vertical=True, offset=5, color='black', fontsize=12)
 
             # Adjust text position with dynamic offset to prevent overlap
-            text_x = -visual_side_panel_thickness - dim_offset_x * 1.5  # Increased horizontal spacing
+            text_x = -visual_side_panel_thickness - dim_offset_x * 1.5
             text_y = (bin_bottom_y + bin_top_y) / 2 + vertical_text_offset
             ax.text(text_x, text_y, level_name, va='center', ha='right', fontsize=12, fontweight='bold', color='black')
 
@@ -179,9 +179,11 @@ def draw_bay_group(params):
     if has_top_cap:
         ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, total_height - visual_shelf_thickness), total_group_width, visual_shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
 
-    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), ground_clearance, f"Ground Clearance: {ground_clearance:.0f} mm", is_vertical=True, offset=10, fontsize=12)
-    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 2, core_width + visual_side_panel_thickness, -dim_offset_y * 2, f"Total Group Width: {total_group_width:.0f} mm", offset=10, fontsize=12)
-    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10, fontsize=12)
+    # Move ground clearance dimension to below the design
+    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 2, core_width + visual_side_panel_thickness, -dim_offset_y * 2, f"Ground Clearance: {ground_clearance:.0f} mm", offset=10, color='black', fontsize=12)
+
+    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 4, core_width + visual_side_panel_thickness, -dim_offset_y * 4, f"Total Group Width: {total_group_width:.0f} mm", offset=10, color='black', fontsize=12)
+    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10, color='black', fontsize=12)
 
     if num_cols > 0:
         dim_y_pos = total_height + dim_offset_y
@@ -194,7 +196,7 @@ def draw_bay_group(params):
     ax.set_aspect('equal', adjustable='box')
     padding_x = core_width * 0.4 + visual_side_panel_thickness
     ax.set_xlim((-padding_x) * zoom_factor, (core_width + padding_x) * zoom_factor)
-    ax.set_ylim(-dim_offset_y * 3 * zoom_factor, total_height + dim_offset_y * 2 * zoom_factor)
+    ax.set_ylim(-dim_offset_y * 5 * zoom_factor, total_height + dim_offset_y * 2 * zoom_factor)  # Adjusted y-limit to accommodate new dimension
     ax.axis('off')
     
     return fig
@@ -246,9 +248,9 @@ def distribute_total_height():
 
 def update_total_height():
     num_shelves_for_calc = group_data['num_rows'] + (1 if group_data['has_top_cap'] else 0)
-    total_shelf_thickness = num_shelves_for_calc * group_data['shelf_thickness']
+    total_shelf_h = num_shelves_for_calc * group_data['shelf_thickness']
     total_net_bin_h = sum(group_data['bin_heights'])
-    group_data['total_height'] = total_net_bin_h + total_shelf_thickness + group_data['ground_clearance']
+    group_data['total_height'] = total_net_bin_h + total_shelf_h + group_data['ground_clearance']
 
 # --- UI and Logic ---
 st.title("Storage Bay Designer")
