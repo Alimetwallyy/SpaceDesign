@@ -69,7 +69,7 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-def draw_dimension_line(ax, x1, y1, x2, y2, text, is_vertical=False, offset=10, color='black', fontsize=12):
+def draw_dimension_line(ax, x1, y1, x2, y2, text, is_vertical=False, offset=10, color='black', fontsize=10):
     """Draws a dimension line with arrows and text on the matplotlib axis."""
     ax.plot([x1, x2], [y1, y2], color=color, lw=1)
     if is_vertical:
@@ -90,6 +90,8 @@ def validate_group_params(params):
         errors.append("Total height must be positive.")
     if params['ground_clearance'] < 0:
         errors.append("Ground clearance cannot be negative.")
+    if params['depth'] <= 0:
+        errors.append("Bay depth must be positive.")
     if params['shelf_thickness'] <= 0:
         errors.append("Shelf thickness must be positive.")
     if params['side_panel_thickness'] <= 0:
@@ -114,6 +116,7 @@ def draw_bay_group(params):
     bay_width = params['bay_width']
     total_height = params['total_height']
     ground_clearance = params['ground_clearance']
+    depth = params['depth']
     shelf_thickness = params['shelf_thickness']
     side_panel_thickness = params['side_panel_thickness']
     num_rows = params['num_rows']
@@ -138,11 +141,6 @@ def draw_bay_group(params):
     ax.add_patch(patches.Rectangle((core_width, 0), visual_side_panel_thickness, total_height, facecolor='none', edgecolor=color, lw=1.5))
 
     current_y = ground_clearance
-    pitch_offset_x = dim_offset_x * 2.5
-
-    # Dynamic vertical offset for text to prevent overlap
-    vertical_text_offset = 0
-    text_spacing = max(10.0, total_height / (num_rows * 2))
 
     for i in range(num_rows):
         shelf_bottom_y = current_y
@@ -151,61 +149,39 @@ def draw_bay_group(params):
         
         if i < len(bin_heights):
             net_bin_h = bin_heights[i]
-            pitch_h = net_bin_h + shelf_thickness
-            pitch_top_y = shelf_bottom_y + pitch_h
-            level_name = chr(65 + i)
-            
             bin_bottom_y = shelf_top_y
             bin_top_y = bin_bottom_y + net_bin_h
-            draw_dimension_line(ax, core_width + visual_side_panel_thickness + dim_offset_x, bin_bottom_y, core_width + visual_side_panel_thickness + dim_offset_x, bin_top_y, f"{net_bin_h:.1f}", is_vertical=True, offset=5, color='#3b82f6', fontsize=12)
-            draw_dimension_line(ax, core_width + visual_side_panel_thickness + pitch_offset_x, shelf_bottom_y, core_width + visual_side_panel_thickness + pitch_offset_x, pitch_top_y, f"{pitch_h:.1f}", is_vertical=True, offset=5, color='black', fontsize=12)
-
-            # Adjust text position with dynamic offset to prevent overlap
-            text_x = -visual_side_panel_thickness - dim_offset_x * 1.5
-            text_y = (bin_bottom_y + bin_top_y) / 2 + vertical_text_offset
-            ax.text(text_x, text_y, level_name, va='center', ha='right', fontsize=12, fontweight='bold', color='black')
-
-            # Increment vertical offset for the next text to avoid overlap
-            vertical_text_offset += text_spacing / (zoom_factor if zoom_factor > 1 else 1)
-
-            # Draw bin divisions for the current row
+            level_name = chr(65 + i)
+            
+            # Draw bin divisions and dimensions inside bins
             num_bins = bin_counts_per_row[i]
             if num_bins > 1:
                 net_width_per_bay = bay_width - 2 * side_panel_thickness
                 bin_width = net_width_per_bay / num_bins
                 bin_start_x = 0
-                for j in range(1, num_bins):
+                for j in range(num_bins):
                     split_x = bin_start_x + (j * bin_width)
-                    ax.add_patch(patches.Rectangle((split_x, bin_bottom_y), 0, net_bin_h, facecolor='none', edgecolor=color, lw=1.5))
+                    ax.add_patch(patches.Rectangle((split_x, bin_bottom_y), bin_width, net_bin_h, facecolor='none', edgecolor=color, lw=1.5, hatch='/' if j % 2 == 0 else None))
+                    # Place dimension text inside the bin
+                    text_x = split_x + (bin_width / 2)
+                    text_y = bin_bottom_y + (net_bin_h / 2)
+                    ax.text(text_x, text_y, f"{bin_width:.1f} x {depth:.1f}", va='center', ha='center', fontsize=8, color='black', bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
 
             current_y = bin_top_y
 
     if has_top_cap:
         ax.add_patch(patches.Rectangle((-visual_side_panel_thickness, total_height - visual_shelf_thickness), total_group_width, visual_shelf_thickness, facecolor='none', edgecolor=color, lw=1.5))
 
-    # Move ground clearance dimension to below the design
-    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 2, core_width + visual_side_panel_thickness, -dim_offset_y * 2, f"Ground Clearance: {ground_clearance:.0f} mm", offset=10, color='black', fontsize=12)
-
-    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 4, core_width + visual_side_panel_thickness, -dim_offset_y * 4, f"Total Group Width: {total_group_width:.0f} mm", offset=10, color='black', fontsize=12)
-    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10, color='black', fontsize=12)
-
-    if max(bin_counts_per_row) > 0:
-        dim_y_pos = total_height + dim_offset_y
-        for i in range(num_rows):
-            num_bins = bin_counts_per_row[i]
-            if num_bins > 0:
-                net_width_per_bay = bay_width - 2 * side_panel_thickness
-                bin_width = net_width_per_bay / num_bins
-                bin_start_x = 0
-                for j in range(num_bins):
-                    dim_start_x = bin_start_x + (j * bin_width)
-                    dim_end_x = dim_start_x + bin_width
-                    draw_dimension_line(ax, dim_start_x, dim_y_pos, dim_end_x, dim_y_pos, f"{bin_width:.1f}", offset=10, color='#3b82f6', fontsize=12)
+    # Draw overall dimensions
+    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 2, core_width + visual_side_panel_thickness, -dim_offset_y * 2, f"Ground Clearance: {ground_clearance:.0f} mm", offset=10, color='black', fontsize=10)
+    draw_dimension_line(ax, -visual_side_panel_thickness, -dim_offset_y * 4, core_width + visual_side_panel_thickness, -dim_offset_y * 4, f"Total Width: {total_group_width:.0f} mm", offset=10, color='black', fontsize=10)
+    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 4), 0, -visual_side_panel_thickness - (dim_offset_x * 4), total_height, f"Total Height: {total_height:.0f} mm", is_vertical=True, offset=10, color='black', fontsize=10)
+    draw_dimension_line(ax, -visual_side_panel_thickness - (dim_offset_x * 6), 0, -visual_side_panel_thickness - (dim_offset_x * 6), depth, f"Depth: {depth:.0f} mm", is_vertical=True, offset=10, color='black', fontsize=10)
 
     ax.set_aspect('equal', adjustable='box')
     padding_x = core_width * 0.4 + visual_side_panel_thickness
     ax.set_xlim((-padding_x) * zoom_factor, (core_width + padding_x) * zoom_factor)
-    ax.set_ylim(-dim_offset_y * 5 * zoom_factor, total_height + dim_offset_y * 2 * zoom_factor)
+    ax.set_ylim(-dim_offset_y * 5 * zoom_factor, max(total_height, depth) + dim_offset_y * 2 * zoom_factor)
     ax.axis('off')
     
     return fig
@@ -267,12 +243,13 @@ if 'bay_group' not in st.session_state:
         "bay_width": 1050.0,
         "total_height": 2000.0,
         "ground_clearance": 50.0,
+        "depth": 600.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
         "num_rows": 3,
         "has_top_cap": True,
         "color": "#4A90E2",
-        "bin_heights": [350.0] * 3,
+        "bin_heights": [350.0, 350.0, 350.0],  # Individual heights
         "lock_heights": [False] * 3,
         "bin_counts_per_row": [3] * 3,
         "zoom": 1.5
@@ -302,12 +279,13 @@ if st.sidebar.button("Reset to Defaults", help="Reset all settings to default va
         "bay_width": 1050.0,
         "total_height": 2000.0,
         "ground_clearance": 50.0,
+        "depth": 600.0,
         "shelf_thickness": 18.0,
         "side_panel_thickness": 18.0,
         "num_rows": 3,
         "has_top_cap": True,
         "color": "#4A90E2",
-        "bin_heights": [350.0] * 3,
+        "bin_heights": [350.0, 350.0, 350.0],  # Individual heights
         "lock_heights": [False] * 3,
         "bin_counts_per_row": [3] * 3,
         "zoom": 1.5
@@ -323,13 +301,14 @@ with col1:
         group_data.update({
             "bay_width": 600.0,
             "total_height": 1200.0,
+            "ground_clearance": 50.0,
+            "depth": 600.0,
             "num_rows": 2,
             "has_top_cap": True,
             "color": "#4A90E2",
-            "bin_heights": [350.0] * 2,
+            "bin_heights": [350.0, 350.0],  # Individual heights
             "lock_heights": [False] * 2,
             "bin_counts_per_row": [2] * 2,
-            "ground_clearance": 50.0,
             "shelf_thickness": 18.0,
             "side_panel_thickness": 18.0,
             "zoom": 1.5
@@ -342,13 +321,14 @@ with col2:
         group_data.update({
             "bay_width": 1050.0,
             "total_height": 2000.0,
+            "ground_clearance": 50.0,
+            "depth": 600.0,
             "num_rows": 3,
             "has_top_cap": True,
             "color": "#4A90E2",
-            "bin_heights": [350.0] * 3,
+            "bin_heights": [350.0, 350.0, 350.0],  # Individual heights
             "lock_heights": [False] * 3,
             "bin_counts_per_row": [3] * 3,
-            "ground_clearance": 50.0,
             "shelf_thickness": 18.0,
             "side_panel_thickness": 18.0,
             "zoom": 1.5
@@ -361,13 +341,14 @@ with col3:
         group_data.update({
             "bay_width": 1500.0,
             "total_height": 3000.0,
+            "ground_clearance": 50.0,
+            "depth": 600.0,
             "num_rows": 4,
             "has_top_cap": True,
             "color": "#4A90E2",
-            "bin_heights": [400.0] * 4,
+            "bin_heights": [400.0, 400.0, 400.0, 400.0],  # Individual heights
             "lock_heights": [False] * 4,
             "bin_counts_per_row": [4] * 4,
-            "ground_clearance": 50.0,
             "shelf_thickness": 18.0,
             "side_panel_thickness": 18.0,
             "zoom": 1.5
@@ -391,6 +372,7 @@ with st.sidebar.expander("Bay Configuration", expanded=False):
     group_data['has_top_cap'] = st.checkbox("Include Top Cap", value=group_data['has_top_cap'], key=f"has_top_cap_{group_data['id']}", on_change=update_total_height, help="Add a top cap shelf to the bay.")
     group_data['shelf_thickness'] = st.number_input("Shelf Thickness (mm)", min_value=1.0, value=float(group_data['shelf_thickness']), key=f"shelf_thick_{group_data['id']}", on_change=update_total_height, help="Thickness of each shelf.")
     group_data['side_panel_thickness'] = st.number_input("Side Panel Thickness (mm)", min_value=1.0, value=float(group_data['side_panel_thickness']), key=f"side_panel_thick_{group_data['id']}", help="Thickness of the outer side panels.")
+    group_data['depth'] = st.number_input("Bay Depth (mm)", min_value=1.0, value=float(group_data['depth']), key=f"depth_{group_data['id']}", on_change=update_total_height, help="Depth of the bay.")
     group_data['color'] = st.color_picker("Structure Color", value=group_data['color'], key=f"color_{group_data['id']}", help="Color of the bay structure in the preview.")
 
 with st.sidebar.expander("Layout", expanded=False):
@@ -407,23 +389,9 @@ with st.sidebar.expander("Bin Count Settings", expanded=False):
 
 with st.sidebar.expander("Bin Height Settings", expanded=False):
     st.markdown("**Configure bin heights.**")
-    auto_distribute = st.checkbox("Auto-distribute Heights", value=True, key=f"auto_distribute_{group_data['id']}", help="Automatically distribute available height evenly across bins.")
-    if not auto_distribute:
-        heights_input = st.text_input("Bin Heights (mm, comma-separated)", value=",".join(str(h) for h in group_data['bin_heights']), key=f"heights_{group_data['id']}", help="Enter heights for each level, e.g., 350,350,350")
-        try:
-            new_heights = [float(h) for h in heights_input.split(",") if h.strip()]
-            if len(new_heights) != group_data['num_rows']:
-                st.error(f"Number of heights ({len(new_heights)}) must match number of rows ({group_data['num_rows']}).")
-            elif any(h <= 0 for h in new_heights):
-                st.error("All bin heights must be positive numbers.")
-            else:
-                group_data['bin_heights'] = new_heights
-                group_data['lock_heights'] = [False] * len(new_heights)
-                update_total_height()
-        except ValueError:
-            st.error("Invalid height format. Use comma-separated numbers (e.g., 350,350,350).")
-    else:
-        distribute_total_height()
+    for i in range(group_data['num_rows']):
+        label = f"Shelf {chr(65 + i)} Height (mm)"
+        group_data['bin_heights'][i] = st.number_input(label, min_value=1.0, value=float(group_data['bin_heights'][i]), key=f"bin_height_{i}_{group_data['id']}", on_change=update_total_height, help=f"Height of shelf {chr(65 + i)}.")
 
 with st.sidebar.expander("Advanced Settings", expanded=False):
     st.markdown("**Adjust advanced visual settings.**")
@@ -441,7 +409,7 @@ col1, col2 = st.columns([1, 2])
 with col1:
     st.header("Key Settings")
     group_data['bay_width'] = st.number_input("Bay Width (mm)", min_value=1.0, value=float(group_data['bay_width']), key=f"bay_width_{group_data['id']}", help="Width of the bay in millimeters.")
-    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=distribute_total_height, help="Total height of the bay.")
+    group_data['total_height'] = st.number_input("Target Total Height (mm)", min_value=1.0, value=float(group_data['total_height']), key=f"total_height_{group_data['id']}", on_change=update_total_height, help="Total height of the bay.")
 
 with col2:
     st.header(f"Design Preview: {group_data['name']}")
