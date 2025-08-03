@@ -110,13 +110,14 @@ def draw_bay_group(params):
     bin_heights = params['bin_heights']
     bin_counts = params['bin_counts_per_row']
     zoom = params.get('zoom', 1.0)
+    design_name = params.get('name', "Storage Bay Design")
 
     fig, ax = plt.subplots(figsize=(12, 8), dpi=100)
     ax.set_facecolor('#f5f5f5')
     ax.grid(False)
 
-    # Title block
-    ax.text(0.5, 1.02, "Storage Bay Design - Rev 1.0", transform=ax.transAxes, ha='center', va='bottom', fontsize=12, fontweight='bold', color='#424242')
+    # Title block with custom name
+    ax.text(0.5, 1.02, f"{design_name} - Rev 1.0", transform=ax.transAxes, ha='center', va='bottom', fontsize=12, fontweight='bold', color='#424242')
 
     # Draw side panels and shelves
     ax.add_patch(Rectangle((-side_thickness, 0), side_thickness, total_height, facecolor='#e0e0e0', edgecolor=color, lw=1.0))
@@ -151,7 +152,8 @@ def draw_bay_group(params):
 
     # Overall dimensions (outside edges)
     draw_dimension_line(ax, -side_thickness - 25, 0, bay_width + side_thickness + 25, 0, f"Total Width: {bay_width + 2 * side_thickness:.0f} mm", False, 10, 'black')
-    draw_dimension_line(ax, -side_thickness - 35, 0, -side_thickness - 35, total_height, f"Total Height: {total_height:.0f} mm", True, 10, 'black')
+    # Total height with vertical arrows (left side, larger and clearer)
+    draw_dimension_line(ax, -side_thickness - 45, 0, -side_thickness - 45, total_height, f"Total Height: {total_height:.0f} mm", True, 20, '#1976d2', fontsize=12)
     # Ground clearance dimension (below design)
     draw_dimension_line(ax, 0, 0, 0, ground_clearance, f"Ground Clearance: {ground_clearance:.0f} mm", True, 10, '#388e3c')
 
@@ -160,7 +162,7 @@ def draw_bay_group(params):
     ax.plot([bay_width - scale_length / 10, bay_width], [-20, -20], color='black', lw=1.0)
     ax.text(bay_width - scale_length / 20, -25, "Scale: 500 mm", ha='center', va='top', fontsize=10, color='black', fontweight='bold')
 
-    ax.set_xlim(-side_thickness * 2 - 40, bay_width + side_thickness * 2 + 40)
+    ax.set_xlim(-side_thickness * 2 - 50, bay_width + side_thickness * 2 + 40)
     ax.set_ylim(-30, total_height + 30)
     ax.axis('off')
     return fig
@@ -205,7 +207,7 @@ def update_total_height():
 if 'bay_group' not in st.session_state:
     st.session_state.bay_group = {
         "id": str(uuid.uuid4()),
-        "name": "Bay Design",
+        "name": "Storage Bay Design",
         "bay_width": 1050.0,
         "total_height": 2000.0,
         "ground_clearance": 50.0,
@@ -251,11 +253,12 @@ with st.sidebar:
     with st.expander("Visual Settings"):
         group_data['color'] = st.color_picker("Bay Color", value=group_data['color'], key=f"color_{group_data['id']}")
         group_data['zoom'] = st.slider("Zoom Level", 0.5, 2.0, group_data['zoom'], 0.1, key=f"zoom_{group_data['id']}")
+        group_data['name'] = st.text_input("Bay Design Name", value=group_data['name'], key=f"name_{group_data['id']}")
     
     if st.button("Reset to Defaults"):
         st.session_state.bay_group = {
             "id": str(uuid.uuid4()),
-            "name": "Bay Design",
+            "name": "Storage Bay Design",
             "bay_width": 1050.0,
             "total_height": 2000.0,
             "ground_clearance": 50.0,
