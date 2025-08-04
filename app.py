@@ -4,10 +4,10 @@ import re
 
 # Function to parse bin ID
 def parse_bin_id(bin_id):
-    pattern = r'^A(\d{2})P(\d{2})L(\d)$'
+    pattern = r'^A(\d{2})P(\d{2,3})L(\d)$'
     match = re.match(pattern, bin_id)
     if not match:
-        raise ValueError(f"Invalid bin ID format: {bin_id}. Expected format: AxxPyyLz (e.g., A08P01L1)")
+        raise ValueError(f"Invalid bin ID format: {bin_id}. Expected format: AxxPyyLz or AxxPyyyLz (e.g., A08P01L1 or A08P100L1)")
     walkway, position, level = match.groups()
     return {
         'Walkway': f"A{walkway}",
@@ -54,10 +54,10 @@ def generate_pick_path(bin_ids):
 
 # Streamlit app
 st.title("Warehouse Pick Path Generator")
-st.write("Enter bin IDs (one per line, format: AxxPyyLz, e.g., A08P01L1) to generate the pick path.")
+st.write("Enter bin IDs (one per line, format: AxxPyyLz or AxxPyyyLz, e.g., A08P01L1 or A08P100L1) to generate the pick path.")
 
 # Input text area
-bin_input = st.text_area("Bin IDs", height=200, placeholder="A08P01L1\nA08P01L2\nA08P02L1\n...")
+bin_input = st.text_area("Bin IDs", height=200, placeholder="A08P01L1\nA08P100L1\nA08P02L1\n...")
 
 if st.button("Generate Pick Path"):
     if bin_input.strip():
