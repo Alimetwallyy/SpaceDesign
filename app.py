@@ -38,7 +38,7 @@ def generate_pick_path(bin_ids):
         walkways = sorted(df['Walkway'].unique())
         sorted_bins = []
         
-        for i, walkway in enumerate(walkways):
+        for walkway in walkways:
             walkway_df = df[df['Walkway'] == walkway]
             # Group by bay pair
             bay_pairs = sorted(walkway_df['BayPair'].unique(), key=lambda x: int(x.split('-')[0][1:]))
@@ -57,14 +57,6 @@ def generate_pick_path(bin_ids):
         # Concatenate all walkways
         result = pd.concat(sorted_bins, ignore_index=True)
         
-        # If odd-numbered walkway index, reverse the order
-        if len(walkways) > 1:
-            for i, walkway in enumerate(walkways):
-                if i % 2 == 1:  # Reverse for odd-indexed walkways (A09, A11, etc.)
-                    walkway_df = result[result['Walkway'] == walkway]
-                    result = result[result['Walkway'] != walkway]
-                    result = pd.concat([result, walkway_df[::-1]], ignore_index=True)
-        
         return result[['Walkway', 'BayPair', 'Position', 'Level', 'BinID']]
     
     except ValueError as e:
@@ -76,7 +68,7 @@ st.title("Warehouse Pick Path Generator")
 st.write("Enter bin IDs (one per line, format: AxxPyyLz or AxxPyyyLz, e.g., A08P01L1 or A08P136L1) to generate the pick path.")
 
 # Input text area
-bin_input = st.text_area("Bin IDs", height=200, placeholder="A08P01L1\nA08P100L1\nA08P136L1\n...")
+bin_input = st.text_area("Bin IDs", height=200, placeholder="A08P01L1\nA08P100L1\nA08P136L1\nA09P01L1\n...")
 
 if st.button("Generate Pick Path"):
     if bin_input.strip():
