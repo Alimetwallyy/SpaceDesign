@@ -1,80 +1,73 @@
 import streamlit as st
 import pandas as pd
 import re
+from io import BytesIO
 
 # Function to parse bin ID
 def parse_bin_id(bin_id):
-    pattern = r'^A(\d{2})P(\d{2,3})L(\d)$'
+    pattern = r'P-(\d+)-([A-Z])(\d+)([A-Z])(\d+)'
     match = re.match(pattern, bin_id)
-    if not match:
-        raise ValueError(f"Invalid bin ID format: {bin_id}. Expected format: AxxPyyLz or AxxPyyyLz (e.g., A08P01L1 or A08P100L1)")
-    walkway, position, level = match.groups()
-    return {
-        'Walkway': f"A{walkway}",
-        'Position': int(position),
-        'Level': int(level),
-        'BinID': bin_id
-    }
+    if match:
+        floor, mod, aisle, shelf, bin_num = match.groups()
+        return {
+            'bin_id': bin_id,
+            'floor': int(floor),
+            'mod': mod,
+            'aisle': int(aisle),
+            'shelf': shelf,
+            'bin_num': int(bin_num)
+        }
+    return None
 
-# Function to assign bay pair based on position
-def get_bay_pair(position):
-    # Each bay pair covers 8 positions (e.g., P01-P08, P09-P16, etc.)
-    bay_pair_start = ((position - 1) // 8) * 8 + 1
-    return f"P{bay_pair_start:03d}-P{bay_pair_start + 7:03d}"
+# Function to sort bins for picking sequence
+def sort_bins(bin_ids):
+    parsed_bins = [parse_bin_id(bin_id) for bin_id in bin_ids if parse_bin_id(bin_id)]
+    # Sort by aisle, then shelf (A to Z), then bin number
+    sorted_bins = sorted(parsed_bins, key=lambda x: (x['aisle'], x['shelf'], x['bin_num']))
+    return sorted_bins
 
-# Function to generate pick path
-def generate_pick_path(bin_ids):
-    try:
-        # Parse all bin IDs
-        bins = [parse_bin_id(bin_id.strip()) for bin_id in bin_ids.split('\n') if bin_id.strip()]
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(bins)
-        
-        # Add BayPair column
-        df['BayPair'] = df['Position'].apply(get_bay_pair)
-        
-        # Group by walkway and sort
-        walkways = sorted(df['Walkway'].unique())
-        sorted_bins = []
-        
-        for walkway in walkways:
-            walkway_df = df[df['Walkway'] == walkway]
-            # Group by bay pair
-            bay_pairs = sorted(walkway_df['BayPair'].unique(), key=lambda x: int(x.split('-')[0][1:]))
-            bay_pair_dfs = []
-            
-            for bay_pair in bay_pairs:
-                bay_pair_df = walkway_df[walkway_df['BayPair'] == bay_pair]
-                # Sort by level, then position within each bay pair
-                bay_pair_sorted = bay_pair_df.sort_values(by=['Level', 'Position'])
-                bay_pair_dfs.append(bay_pair_sorted)
-            
-            # Concatenate all bay pairs for this walkway
-            walkway_sorted = pd.concat(bay_pair_dfs, ignore_index=True)
-            sorted_bins.append(walkway_sorted)
-        
-        # Concatenate all walkways
-        result = pd.concat(sorted_bins, ignore_index=True)
-        
-        return result[['Walkway', 'BayPair', 'Position', 'Level', 'BinID']]
-    
-    except ValueError as e:
-        st.error(str(e))
-        return None
+# Function to convert sorted bins to Excel
+def to_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Pick Sequence')
+    return output.getvalue()
 
 # Streamlit app
-st.title("Warehouse Pick Path Generator")
-st.write("Enter bin IDs (one per line, format: AxxPyyLz or AxxPyyyLz, e.g., A08P01L1 or A08P136L1) to generate the pick path.")
+st.title("Warehouse Pick Sequence Generator")
+st.write("Enter bin IDs (one per line, e.g., P-1-B200A200) and generate a sorted pick sequence.")
 
-# Input text area
-bin_input = st.text_area("Bin IDs", height=200, placeholder="A08P01L1\nA08P100L1\nA08P136L1\nA09P01L1\n...")
+# Input for bin IDs
+bin_input = st.text_area("Enter Bin IDs", placeholder="P-1-B200A200\nP-1-B200A201\nP-1-B201B202")
+generate_button = st.button("Generate Pick Sequence")
 
-if st.button("Generate Pick Path"):
-    if bin_input.strip():
-        pick_path = generate_pick_path(bin_input)
-        if pick_path is not None:
-            st.subheader("Generated Pick Path")
-            st.dataframe(pick_path, use_container_width=True)
+if generate_button and bin_input:
+    # Process input
+    bin_ids = [bid.strip() for bid in bin_input.split('\n') if bid.strip()]
+    if not bin_ids:
+        st.error("Please enter at least one valid bin ID.")
     else:
-        st.warning("Please enter at least one valid bin ID.")
+        # Parse and sort bins
+        sorted_bins = sort_bins(bin_ids)
+        if not sorted_bins:
+            st.error("No valid bin IDs found. Format: P-floor-mod aisle shelf bin (e.g., P-1-B200A200).")
+        else:
+            # Create DataFrame
+            df = pd.DataFrame(sorted_bins)
+            df = df[['bin_id', 'floor', 'mod', 'aisle', 'shelf', 'bin_num']]
+            df.columns = ['Bin ID', 'Floor', 'Mod', 'Aisle', 'Shelf', 'Bin Number']
+            
+            # Display results
+            st.subheader("Sorted Pick Sequence")
+            st.dataframe(df)
+            
+            # Excel download
+            excel_data = to_excel(df)
+            st.download_button(
+                label="Download Pick Sequence as Excel",
+                data=excel_data,
+                file_name="pick_sequence.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+else:
+    st.info("Enter bin IDs and click 'Generate Pick Sequence' to see results.")
